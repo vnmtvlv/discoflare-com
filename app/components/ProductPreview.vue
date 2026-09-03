@@ -27,7 +27,7 @@ const activeScreenshot = computed(() => screenshots[activeIndex.value] ?? screen
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-2xl border border-default bg-elevated shadow-2xl shadow-primary/10">
+  <div class="overflow-hidden rounded-lg border border-default bg-elevated shadow-2xl shadow-primary/10">
     <div class="aspect-[1863/1324] overflow-hidden bg-[#292a2e]">
       <Transition name="hero-screenshot" mode="out-in">
         <img
