@@ -6,6 +6,10 @@ const creatorUrl = 'https://github.com/vnmtvlv'
 const deployUrl = 'https://deploy.workers.cloudflare.com/?url=https://github.com/vnmtvlv/discoflare'
 const sandboxUrl = 'https://sandbox.discoflare.com'
 const siteUrl = 'https://discoflare.com/'
+const websiteId = `${siteUrl}#website`
+const organizationId = `${siteUrl}#organization`
+const softwareId = `${siteUrl}#software`
+const logoUrl = 'https://discoflare.com/brand/logo-256.png'
 const socialImageUrl = 'https://discoflare.com/og-image.png'
 const pageTitle = 'Discoflare — Team chat on your Cloudflare account'
 const pageDescription = 'Open-source, self-hosted team chat for channels, threads, files, and huddles—running in your Cloudflare account.'
@@ -116,24 +120,54 @@ useHead({
     type: 'application/ld+json',
     innerHTML: JSON.stringify({
       '@context': 'https://schema.org',
-      '@type': 'SoftwareApplication',
-      name: 'Discoflare',
-      url: siteUrl,
-      image: socialImageUrl,
-      description: pageDescription,
-      applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Web',
-      license: 'https://opensource.org/license/mit',
-      author: {
-        '@type': 'Person',
-        name: 'vnmtvlv',
-        url: creatorUrl,
-      },
-      offers: {
-        '@type': 'Offer',
-        price: '0',
-        priceCurrency: 'USD',
-      },
+      '@graph': [
+        {
+          '@type': 'WebSite',
+          '@id': websiteId,
+          url: siteUrl,
+          name: 'Discoflare',
+          description: pageDescription,
+          publisher: { '@id': organizationId },
+        },
+        {
+          '@type': 'Organization',
+          '@id': organizationId,
+          name: 'Discoflare',
+          url: siteUrl,
+          logo: {
+            '@type': 'ImageObject',
+            '@id': `${siteUrl}#logo`,
+            url: logoUrl,
+            contentUrl: logoUrl,
+            width: 256,
+            height: 256,
+          },
+        },
+        {
+          '@type': 'SoftwareApplication',
+          '@id': softwareId,
+          name: 'Discoflare',
+          url: siteUrl,
+          image: socialImageUrl,
+          description: pageDescription,
+          applicationCategory: 'CommunicationApplication',
+          operatingSystem: 'Web',
+          license: 'https://opensource.org/license/mit',
+          isPartOf: { '@id': websiteId },
+          publisher: { '@id': organizationId },
+          sameAs: repoUrl,
+          author: {
+            '@type': 'Person',
+            name: 'vnmtvlv',
+            url: creatorUrl,
+          },
+          offers: {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'USD',
+          },
+        },
+      ],
     }),
   }],
 })
