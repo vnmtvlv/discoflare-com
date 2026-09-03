@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "nuxt build",
+    "deploy": "pnpm dlx wrangler@4.128.0 deploy",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "postinstall": "nuxt prepare",

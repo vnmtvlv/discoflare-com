@@ -1,0 +1,15 @@
+{
+  "name": "discoflare-com",
+  "compatibility_date": "2026-09-03",
+  "assets": {
+    "directory": "./.output/public",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    {
+      "pattern": "discoflare.com",
+      "custom_domain": true
+    }
+  ]
+}

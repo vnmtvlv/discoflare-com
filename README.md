@@ -18,6 +18,17 @@ pnpm generate
 
 The site is fully prerendered and the deployable output is written to `.output/public`.
 
+## Deployment
+
+Cloudflare Workers Builds deploys the site automatically when a commit is pushed to `main`:
+
+```bash
+pnpm generate
+pnpm deploy
+```
+
+The Worker and `discoflare.com` custom domain are configured in [`wrangler.jsonc`](wrangler.jsonc).
+
 ## Product demos
 
 Demo sections use coded previews until real product recordings are ready. See [`public/demos/README.md`](public/demos/README.md) for the video convention.
