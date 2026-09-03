@@ -262,7 +262,7 @@ useHead({
             </div>
 
             <div>
-              <div class="mb-8 aspect-video overflow-hidden rounded-2xl border border-default bg-elevated p-6 shadow-xl sm:p-8">
+              <div class="mb-8 min-h-44 overflow-hidden rounded-2xl border border-default bg-elevated p-6 shadow-xl sm:aspect-video sm:min-h-0 sm:p-8">
                 <DeployDemo />
               </div>
               <ol class="space-y-6">

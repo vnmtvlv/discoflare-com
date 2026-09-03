@@ -34,7 +34,7 @@ const videoFailed = ref(false)
         class="aspect-video w-full rounded-2xl border border-default bg-elevated object-cover shadow-xl"
         @error="videoFailed = true"
       />
-      <div v-else class="aspect-video overflow-hidden rounded-2xl border border-default bg-elevated p-5 shadow-xl sm:p-7">
+      <div v-else class="min-h-[17rem] overflow-hidden rounded-2xl border border-default bg-elevated p-5 shadow-xl sm:aspect-video sm:min-h-0 sm:p-7">
         <slot />
       </div>
     </div>
