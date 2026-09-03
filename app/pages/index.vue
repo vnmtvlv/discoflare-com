@@ -1,0 +1,363 @@
+<script setup lang="ts">
+import type { AccordionItem, NavigationMenuItem } from '@nuxt/ui'
+
+const repoUrl = 'https://github.com/vnmtvlv/discoflare'
+const creatorUrl = 'https://github.com/vnmtvlv'
+const deployUrl = 'https://deploy.workers.cloudflare.com/?url=https://github.com/vnmtvlv/discoflare'
+const sandboxUrl = 'https://sandbox.discoflare.com'
+const siteUrl = 'https://discoflare.com/'
+const socialImageUrl = 'https://discoflare.com/og-image.png'
+const pageTitle = 'Discoflare — Team chat on your Cloudflare account'
+const pageDescription = 'Open-source, self-hosted team chat for channels, threads, files, and huddles—running in your Cloudflare account.'
+const currentYear = new Date().getFullYear()
+const copyrightYears = currentYear === 2026 ? '2026' : `2026–${currentYear}`
+
+const navigation = computed<NavigationMenuItem[]>(() => [
+  { label: 'Features', to: '#features' },
+  { label: 'Deploy', to: '#deploy' },
+  { label: 'Pricing', to: '#pricing' },
+  { label: 'FAQ', to: '#faq' },
+])
+
+const features = [
+  {
+    icon: 'i-ph-cloud',
+    title: 'Your Cloudflare account',
+    description: 'The Worker, database, files, and live connections run in infrastructure you control.',
+  },
+  {
+    icon: 'i-ph-lightning',
+    title: 'Real-time channels',
+    description: 'Public and private channels with replies, threads, reactions, mentions, typing, and presence.',
+  },
+  {
+    icon: 'i-ph-headphones',
+    title: 'Voice huddles',
+    description: 'Start a huddle from a voice channel with Cloudflare RealtimeKit.',
+  },
+  {
+    icon: 'i-ph-folder-open',
+    title: 'Files stay with you',
+    description: 'Attachments are stored in an R2 bucket inside your Cloudflare account.',
+  },
+  {
+    icon: 'i-ph-shield-check',
+    title: 'Workspace controls',
+    description: 'Invite members, assign roles, manage permissions, and review audit history.',
+  },
+  {
+    icon: 'i-ph-code',
+    title: 'Open source',
+    description: 'Read the code, run it yourself, and adapt it under the MIT license.',
+  },
+]
+
+const deploySteps = [
+  { number: '01', title: 'Open the deploy flow', description: 'Cloudflare imports the public Discoflare repository.' },
+  { number: '02', title: 'Set the owner credentials', description: 'Add the required secrets and optional X or huddle configuration.' },
+  { number: '03', title: 'Open your workspace', description: 'Cloudflare provisions the declared services and starts Discoflare.' },
+]
+
+const faqItems: AccordionItem[] = [
+  {
+    label: 'What do I need to run Discoflare?',
+    content: 'A Cloudflare account. The deploy flow creates the declared Worker, D1 database, R2 bucket, KV namespace, and Durable Objects. Voice huddles require separate RealtimeKit configuration.',
+  },
+  {
+    label: 'Is Discoflare free?',
+    content: 'The software is free and MIT licensed. Cloudflare services and RealtimeKit, when enabled, are billed by their providers according to your usage and plan.',
+  },
+  {
+    label: 'Where is workspace data stored?',
+    content: 'Messages and workspace data use D1, attachments use R2, and short-lived connection tickets use KV. These resources live in the Cloudflare account used for deployment.',
+  },
+  {
+    label: 'Can I try it before deploying?',
+    content: 'Yes. The public sandbox is the official pilot workspace. Use it to get a feel for Discoflare before creating your own deployment.',
+  },
+  {
+    label: 'Does team chat depend on voice configuration?',
+    content: 'No. Text chat works without RealtimeKit. Huddles remain unavailable until the optional voice integration is configured.',
+  },
+  {
+    label: 'Are native apps available?',
+    content: 'Not yet. Desktop, iOS, and Android clients are planned for later; the current release is the web application.',
+  },
+]
+
+useSeoMeta({
+  title: pageTitle,
+  description: pageDescription,
+  author: 'vnmtvlv',
+  applicationName: 'Discoflare',
+  robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+  ogTitle: pageTitle,
+  ogDescription: pageDescription,
+  ogType: 'website',
+  ogUrl: siteUrl,
+  ogSiteName: 'Discoflare',
+  ogLocale: 'en_US',
+  ogImage: socialImageUrl,
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageType: 'image/png',
+  ogImageAlt: 'Discoflare — team chat on your Cloudflare account',
+  twitterCard: 'summary_large_image',
+  twitterTitle: pageTitle,
+  twitterDescription: pageDescription,
+  twitterImage: socialImageUrl,
+  twitterImageAlt: 'Discoflare — team chat on your Cloudflare account',
+})
+
+useHead({
+  link: [{ rel: 'canonical', href: siteUrl }],
+  script: [{
+    type: 'application/ld+json',
+    innerHTML: JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: 'Discoflare',
+      url: siteUrl,
+      image: socialImageUrl,
+      description: pageDescription,
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      license: 'https://opensource.org/license/mit',
+      author: {
+        '@type': 'Person',
+        name: 'vnmtvlv',
+        url: creatorUrl,
+      },
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'USD',
+      },
+    }),
+  }],
+})
+</script>
+
+<template>
+  <div class="min-h-screen overflow-x-clip bg-default text-default">
+    <UHeader class="border-b border-muted/70 bg-default/80 backdrop-blur-xl">
+      <template #title>
+        <BrandLogo />
+      </template>
+
+      <UNavigationMenu :items="navigation" class="hidden lg:flex" />
+
+      <template #right>
+        <UColorModeButton color="neutral" variant="ghost" />
+        <UButton
+          :to="repoUrl"
+          target="_blank"
+          label="GitHub"
+          icon="i-ph-github-logo"
+          color="neutral"
+          variant="ghost"
+          class="hidden sm:inline-flex"
+        />
+        <UButton :to="sandboxUrl" target="_blank" label="Try sandbox" color="neutral" variant="outline" />
+      </template>
+
+      <template #body>
+        <UNavigationMenu :items="navigation" orientation="vertical" class="-mx-2.5" />
+        <UButton :to="repoUrl" target="_blank" label="GitHub" icon="i-ph-github-logo" color="neutral" variant="ghost" class="mt-4 w-full justify-center" />
+      </template>
+    </UHeader>
+
+    <main>
+      <section class="relative border-b border-muted py-20 sm:py-28 lg:py-32">
+        <div class="noise-grid pointer-events-none absolute inset-0 -z-10" />
+        <div class="orange-glow pointer-events-none absolute left-1/2 top-0 -z-10 h-96 w-3/4 -translate-x-1/2 blur-3xl" />
+        <UContainer>
+          <div class="mx-auto max-w-4xl text-center">
+            <UBadge color="neutral" variant="outline" class="mb-7" icon="i-ph-code">
+              Open source · MIT licensed
+            </UBadge>
+            <h1 class="display-title text-5xl font-semibold leading-[1.02] text-highlighted sm:text-7xl lg:text-8xl">
+              Team chat on your Cloudflare account.
+            </h1>
+            <p class="mx-auto mt-7 max-w-2xl text-lg leading-8 text-muted sm:text-xl">
+              One private workspace for channels, threads, files, and huddles. Self-host Discoflare without running an origin server.
+            </p>
+            <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <UButton
+                :to="deployUrl"
+                target="_blank"
+                label="Deploy to Cloudflare"
+                trailing-icon="i-ph-arrow-up-right"
+                size="xl"
+              />
+              <UButton
+                :to="sandboxUrl"
+                target="_blank"
+                label="Open the sandbox"
+                icon="i-ph-play-circle"
+                color="neutral"
+                variant="outline"
+                size="xl"
+              />
+            </div>
+            <p class="mt-4 text-xs text-dimmed">Cloudflare usage is billed by Cloudflare.</p>
+          </div>
+
+          <div class="relative mx-auto mt-16 max-w-6xl sm:mt-20">
+            <div class="orange-glow pointer-events-none absolute -inset-24 -z-10 blur-3xl" />
+            <ProductPreview />
+          </div>
+        </UContainer>
+      </section>
+
+      <section id="features" class="border-b border-muted py-20 sm:py-28">
+        <UContainer>
+          <div class="max-w-2xl">
+            <p class="mb-3 text-sm font-medium text-primary">Built for one workspace</p>
+            <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">Chat infrastructure without the chat vendor.</h2>
+          </div>
+          <div class="mt-12 grid gap-px overflow-hidden rounded-2xl border border-muted bg-muted sm:grid-cols-2 lg:grid-cols-3">
+            <article v-for="feature in features" :key="feature.title" class="bg-default p-7 sm:p-8">
+              <UIcon :name="feature.icon" class="size-6 text-primary" />
+              <h3 class="mt-6 font-semibold text-highlighted">{{ feature.title }}</h3>
+              <p class="mt-2 text-sm leading-6 text-muted">{{ feature.description }}</p>
+            </article>
+          </div>
+        </UContainer>
+      </section>
+
+      <section class="border-b border-muted">
+        <UContainer>
+          <DemoPanel
+            eyebrow="Channels and threads"
+            title="Keep the conversation close to the work."
+            description="Organize discussion in public or private channels. Reply in place, move details into threads, add reactions, and see who is around."
+            icon="i-ph-chats-circle"
+          >
+            <ChannelDemo />
+          </DemoPanel>
+
+          <div class="border-t border-muted" />
+
+          <DemoPanel
+            eyebrow="Voice huddles"
+            title="Move from typing to talking."
+            description="Start a voice huddle from a channel when text is not enough. RealtimeKit carries the media while Discoflare keeps the workspace context."
+            icon="i-ph-waveform"
+            reverse
+          >
+            <HuddleDemo />
+          </DemoPanel>
+        </UContainer>
+      </section>
+
+      <section id="deploy" class="border-b border-muted py-20 sm:py-28">
+        <UContainer>
+          <div class="grid items-start gap-14 lg:grid-cols-[1fr_1.05fr] lg:gap-20">
+            <div>
+              <p class="mb-3 text-sm font-medium text-primary">One-click deployment</p>
+              <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">Your workspace. Your account.</h2>
+              <p class="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
+                Discoflare deploys as one Nuxt Worker and connects the Cloudflare services declared by the project.
+              </p>
+              <UButton :to="deployUrl" target="_blank" label="Deploy to Cloudflare" trailing-icon="i-ph-arrow-up-right" size="lg" class="mt-8" />
+            </div>
+
+            <div>
+              <div class="mb-8 aspect-video overflow-hidden rounded-2xl border border-default bg-elevated p-6 shadow-xl sm:p-8">
+                <DeployDemo />
+              </div>
+              <ol class="space-y-6">
+                <li v-for="step in deploySteps" :key="step.number" class="flex gap-5">
+                  <span class="font-mono text-sm text-primary">{{ step.number }}</span>
+                  <div>
+                    <h3 class="font-medium text-highlighted">{{ step.title }}</h3>
+                    <p class="mt-1 text-sm leading-6 text-muted">{{ step.description }}</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+          </div>
+        </UContainer>
+      </section>
+
+      <section id="pricing" class="border-b border-muted py-20 sm:py-28">
+        <UContainer>
+          <div class="mx-auto max-w-3xl text-center">
+            <p class="mb-3 text-sm font-medium text-primary">Pricing</p>
+            <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">The software costs nothing.</h2>
+            <p class="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted sm:text-lg">
+              Discoflare is free and open source. You pay Cloudflare directly for the infrastructure your workspace uses.
+            </p>
+          </div>
+
+          <UCard class="mx-auto mt-12 max-w-2xl" :ui="{ body: 'p-7 sm:p-10' }">
+            <div class="flex flex-col justify-between gap-8 sm:flex-row sm:items-end">
+              <div>
+                <p class="font-medium text-highlighted">Self-hosted</p>
+                <div class="mt-4 flex items-baseline gap-2">
+                  <span class="text-5xl font-semibold tracking-tight text-highlighted">$0</span>
+                  <span class="text-muted">software license</span>
+                </div>
+                <ul class="mt-7 space-y-3 text-sm text-toned">
+                  <li v-for="item in ['MIT licensed', 'One workspace per deployment', 'No Discoflare subscription']" :key="item" class="flex items-center gap-2">
+                    <UIcon name="i-ph-check-circle" class="size-4 text-primary" />
+                    {{ item }}
+                  </li>
+                </ul>
+              </div>
+              <UButton :to="repoUrl" target="_blank" label="View source" icon="i-ph-github-logo" color="neutral" variant="outline" size="lg" />
+            </div>
+          </UCard>
+        </UContainer>
+      </section>
+
+      <section id="faq" class="border-b border-muted py-20 sm:py-28">
+        <UContainer>
+          <div class="grid gap-12 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20">
+            <div>
+              <p class="mb-3 text-sm font-medium text-primary">FAQ</p>
+              <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">Before you deploy.</h2>
+            </div>
+            <UAccordion :items="faqItems" type="multiple" :ui="{ item: 'border-b border-muted', label: 'text-base' }" />
+          </div>
+        </UContainer>
+      </section>
+
+      <section class="py-20 sm:py-28">
+        <UContainer>
+          <div class="relative overflow-hidden rounded-3xl border border-primary/20 bg-primary/6 px-6 py-16 text-center sm:px-12 sm:py-20">
+            <div class="orange-glow pointer-events-none absolute inset-0 -z-10" />
+            <img src="/brand/logo-128.png" alt="" class="mx-auto size-16" width="64" height="64">
+            <h2 class="display-title mx-auto mt-6 max-w-2xl text-4xl font-semibold text-highlighted sm:text-5xl">Bring your team chat home.</h2>
+            <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <UButton :to="deployUrl" target="_blank" label="Deploy Discoflare" trailing-icon="i-ph-arrow-up-right" size="xl" />
+              <UButton :to="repoUrl" target="_blank" label="Star on GitHub" icon="i-ph-star" color="neutral" variant="outline" size="xl" />
+            </div>
+          </div>
+        </UContainer>
+      </section>
+    </main>
+
+    <UFooter class="border-t border-muted">
+      <template #left>
+        <BrandLogo />
+      </template>
+      <div class="flex flex-col items-center gap-2 text-center text-sm text-muted">
+        <p>One workspace for humans, agents, and tasks.</p>
+        <nav aria-label="Legal" class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+          <NuxtLink to="/privacy" class="transition-colors hover:text-highlighted">Privacy</NuxtLink>
+          <NuxtLink to="/terms" class="transition-colors hover:text-highlighted">Terms</NuxtLink>
+          <span>© {{ copyrightYears }} Discoflare</span>
+          <span>
+            by
+            <a :href="creatorUrl" target="_blank" rel="noopener noreferrer" class="transition-colors hover:text-highlighted">vnmtvlv</a>
+          </span>
+        </nav>
+      </div>
+      <template #right>
+        <UButton :to="repoUrl" target="_blank" aria-label="Discoflare on GitHub" icon="i-ph-github-logo" color="neutral" variant="ghost" />
+      </template>
+    </UFooter>
+  </div>
+</template>
