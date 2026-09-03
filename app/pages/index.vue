@@ -21,6 +21,43 @@ const navigation = computed<NavigationMenuItem[]>(() => [
   { label: 'FAQ', to: '#faq' },
 ])
 
+const sectionIds = ['features', 'deploy', 'pricing', 'faq'] as const
+let scrollFrame: number | undefined
+
+function syncHashToScroll() {
+  const activeSection = sectionIds.findLast((sectionId) => {
+    const section = document.getElementById(sectionId)
+    return section ? section.getBoundingClientRect().top <= 96 : false
+  })
+  const nextHash = activeSection ? `#${activeSection}` : ''
+
+  if (window.location.hash === nextHash) return
+
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${window.location.pathname}${window.location.search}${nextHash}`,
+  )
+}
+
+function scheduleHashSync() {
+  if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame)
+
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = undefined
+    syncHashToScroll()
+  })
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', scheduleHashSync, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', scheduleHashSync)
+  if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame)
+})
+
 const features = [
   {
     icon: 'i-ph-cloud',
