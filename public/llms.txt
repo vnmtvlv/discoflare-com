@@ -1,0 +1,26 @@
+# Discoflare
+
+> Open-source, self-hosted team chat for channels, threads, files, and optional voice huddles, running in the workspace owner's Cloudflare account.
+
+Discoflare is MIT-licensed software. Each deployment creates one workspace without a separate origin server. The workspace owner controls the deployment, configuration, and data. Cloudflare infrastructure usage is billed separately by Cloudflare.
+
+## Product
+
+- [Product overview](https://discoflare.com/index.md): Concise product capabilities, architecture, deployment, and availability information.
+- [Source repository](https://github.com/vnmtvlv/discoflare): Source code, software documentation, license, and issue tracking.
+
+## Documentation
+
+- [Architecture](https://github.com/vnmtvlv/discoflare/blob/main/docs/architecture.md): Runtime topology, Cloudflare services, data ownership, and request flows.
+- [Deployment guide](https://github.com/vnmtvlv/discoflare/blob/main/docs/deployment.md): Required credentials, optional integrations, provisioning, and readiness checks.
+
+## Policies
+
+- [Privacy policy](https://discoflare.com/privacy.md): How the Discoflare marketing site handles information.
+- [Terms of use](https://discoflare.com/terms.md): Terms governing use of the Discoflare marketing site.
+
+## Optional
+
+- [Human-readable website](https://discoflare.com/): The canonical Discoflare product website.
+- [Public sandbox](https://sandbox.discoflare.com): A hosted workspace for trying Discoflare before deploying it.
+- [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/vnmtvlv/discoflare): Browser-based one-click deployment into a Cloudflare account.

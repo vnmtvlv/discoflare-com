@@ -34,3 +34,7 @@ The Worker and `discoflare.com` custom domain are configured in [`wrangler.jsonc
 Demo sections use coded previews until real product recordings are ready. See [`public/demos/README.md`](public/demos/README.md) for the video convention.
 
 Brand assets are copied from the Discoflare product repository so this site can deploy independently.
+
+## Crawler and agent discovery
+
+`public/robots.txt` keeps the public site crawlable and points to `public/sitemap.xml`. `public/llms.txt` is the concise agent entry point and links to Markdown versions of the product, privacy, and terms pages. Keep those files aligned whenever the corresponding site content changes.

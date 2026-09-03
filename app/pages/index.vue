@@ -108,7 +108,10 @@ useSeoMeta({
 })
 
 useHead({
-  link: [{ rel: 'canonical', href: siteUrl }],
+  link: [
+    { rel: 'canonical', href: siteUrl },
+    { rel: 'alternate', type: 'text/markdown', href: 'https://discoflare.com/index.md' },
+  ],
   script: [{
     type: 'application/ld+json',
     innerHTML: JSON.stringify({

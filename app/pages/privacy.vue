@@ -19,7 +19,12 @@ useSeoMeta({
   twitterImage: 'https://discoflare.com/og-image.png',
 })
 
-useHead({ link: [{ rel: 'canonical', href: siteUrl }] })
+useHead({
+  link: [
+    { rel: 'canonical', href: siteUrl },
+    { rel: 'alternate', type: 'text/markdown', href: 'https://discoflare.com/privacy.md' },
+  ],
+})
 </script>
 
 <template>
