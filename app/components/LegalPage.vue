@@ -6,8 +6,6 @@ defineProps<{
 }>()
 
 const creatorUrl = 'https://github.com/vnmtvlv'
-const currentYear = new Date().getFullYear()
-const copyrightYears = currentYear === 2026 ? '2026' : `2026–${currentYear}`
 </script>
 
 <template>
@@ -42,7 +40,7 @@ const copyrightYears = currentYear === 2026 ? '2026' : `2026–${currentYear}`
       <template #left>
         <BrandLogo />
       </template>
-      <p class="text-center text-xs text-muted">© {{ copyrightYears }} Discoflare · by <a :href="creatorUrl" target="_blank" rel="noopener noreferrer" class="hover:text-highlighted">vnmtvlv</a></p>
+      <p class="text-center text-xs text-muted">by <a :href="creatorUrl" target="_blank" rel="noopener noreferrer" class="hover:text-highlighted">vnmtvlv</a></p>
       <template #right>
         <nav aria-label="Legal" class="flex items-center gap-3 text-sm text-muted">
           <NuxtLink to="/privacy" class="hover:text-highlighted">Privacy</NuxtLink>

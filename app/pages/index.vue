@@ -9,8 +9,6 @@ const siteUrl = 'https://discoflare.com/'
 const socialImageUrl = 'https://discoflare.com/og-image.png'
 const pageTitle = 'Discoflare — Team chat on your Cloudflare account'
 const pageDescription = 'Open-source, self-hosted team chat for channels, threads, files, and huddles—running in your Cloudflare account.'
-const currentYear = new Date().getFullYear()
-const copyrightYears = currentYear === 2026 ? '2026' : `2026–${currentYear}`
 
 const navigation = computed<NavigationMenuItem[]>(() => [
   { label: 'Features', to: '#features' },
@@ -177,10 +175,10 @@ useHead({
               Open source · MIT licensed
             </UBadge>
             <h1 class="display-title text-5xl font-semibold leading-[1.02] text-highlighted sm:text-7xl lg:text-8xl">
-              Team chat on your Cloudflare account.
+              One workspace for humans, agents, and tasks.
             </h1>
             <p class="mx-auto mt-7 max-w-2xl text-lg leading-8 text-muted sm:text-xl">
-              One private workspace for channels, threads, files, and huddles. Self-host Discoflare without running an origin server.
+              Self-host Discoflare in your Cloudflare account—channels, threads, files, and huddles, without an origin server.
             </p>
             <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <UButton
@@ -343,18 +341,14 @@ useHead({
       <template #left>
         <BrandLogo />
       </template>
-      <div class="flex flex-col items-center gap-2 text-center text-sm text-muted">
-        <p>One workspace for humans, agents, and tasks.</p>
-        <nav aria-label="Legal" class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
-          <NuxtLink to="/privacy" class="transition-colors hover:text-highlighted">Privacy</NuxtLink>
-          <NuxtLink to="/terms" class="transition-colors hover:text-highlighted">Terms</NuxtLink>
-          <span>© {{ copyrightYears }} Discoflare</span>
-          <span>
-            by
-            <a :href="creatorUrl" target="_blank" rel="noopener noreferrer" class="transition-colors hover:text-highlighted">vnmtvlv</a>
-          </span>
-        </nav>
-      </div>
+      <nav aria-label="Legal" class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted">
+        <NuxtLink to="/privacy" class="transition-colors hover:text-highlighted">Privacy</NuxtLink>
+        <NuxtLink to="/terms" class="transition-colors hover:text-highlighted">Terms</NuxtLink>
+        <span>
+          by
+          <a :href="creatorUrl" target="_blank" rel="noopener noreferrer" class="transition-colors hover:text-highlighted">vnmtvlv</a>
+        </span>
+      </nav>
       <template #right>
         <UButton :to="repoUrl" target="_blank" aria-label="Discoflare on GitHub" icon="i-ph-github-logo" color="neutral" variant="ghost" />
       </template>
