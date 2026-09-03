@@ -28,14 +28,14 @@ const activeScreenshot = computed(() => screenshots[activeIndex.value] ?? screen
 
 <template>
   <div class="overflow-hidden rounded-lg border border-default bg-elevated shadow-2xl shadow-primary/10">
-    <div class="aspect-[1863/1324] overflow-hidden bg-[#292a2e]">
+    <div class="aspect-[8/5] overflow-hidden bg-[#292a2e]">
       <Transition name="hero-screenshot" mode="out-in">
         <img
           :key="activeScreenshot.src"
           :src="activeScreenshot.src"
           :alt="activeScreenshot.alt"
-          width="1863"
-          height="1324"
+          width="1600"
+          height="1000"
           class="size-full object-contain"
           decoding="async"
           fetchpriority="high"
