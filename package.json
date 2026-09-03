@@ -10,7 +10,7 @@
     "build": "nuxt build",
     "deploy": "pnpm dlx wrangler@4.128.0 deploy",
     "dev": "nuxt dev",
-    "generate": "nuxt generate",
+    "generate": "nuxt generate --preset=static",
     "postinstall": "nuxt prepare",
     "preview": "nuxt preview",
     "typecheck": "nuxt typecheck"
