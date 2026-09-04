@@ -80,6 +80,7 @@ useSeoMeta({
           <div v-else-if="!session.connected" class="mt-10 grid gap-3 sm:grid-cols-2">
             <UButton
               to="/api/cloudflare/oauth/start?returnTo=/deploy"
+              external
               label="Connect Cloudflare"
               trailing-icon="i-ph-arrow-right"
               size="xl"
