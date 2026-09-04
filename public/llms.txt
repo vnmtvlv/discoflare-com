@@ -1,6 +1,6 @@
 # Discoflare
 
-> Open-source, self-hosted team chat for channels, threads, files, and optional voice huddles, running in the workspace owner's Cloudflare account.
+> Open-source, self-hosted team chat for channels, threads, files, agents, tasks, and optional voice huddles, running in the workspace owner's Cloudflare account.
 
 Discoflare is MIT-licensed software. Each deployment creates one workspace without a separate origin server. The workspace owner controls the deployment, configuration, and data. Cloudflare infrastructure usage is billed separately by Cloudflare.
 

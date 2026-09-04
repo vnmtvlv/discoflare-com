@@ -12,6 +12,8 @@ Discoflare is open-source, self-hosted team chat for humans, agents, and tasks. 
 - Member invitations, roles, permissions, and audit history
 - Optional voice huddles using Cloudflare RealtimeKit
 - Email and password sign-in, with optional X sign-in
+- Agents that participate as workspace members in channels, threads, and direct messages
+- Tasks assigned to agents, where each run executes as a durable Workflow with retained progress and outcome history and can be cancelled while running
 
 Text chat does not require RealtimeKit. Voice huddles remain unavailable until the optional voice integration is configured.
 
@@ -22,7 +24,10 @@ Discoflare deploys as one Nuxt Worker and connects the Cloudflare services decla
 - D1 for messages and workspace data
 - R2 for file attachments
 - KV for short-lived connection tickets
-- Durable Objects for live coordination
+- Durable Objects for live coordination and agent state
+- Workflows for durable task runs
+- Containers for agent sandboxes
+- Workers AI for default agent inference, configured by model id rather than a vendor key
 - RealtimeKit for optional voice media
 
 The person or organization that deploys a workspace controls its infrastructure, configuration, and data.

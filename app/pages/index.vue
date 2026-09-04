@@ -17,12 +17,13 @@ const pageDescription = 'Open-source, self-hosted team chat for channels, thread
 
 const navigation = computed<NavigationMenuItem[]>(() => [
   { label: 'Features', to: '#features' },
+  { label: 'Agents', to: '#agents' },
   { label: 'Deploy', to: '#deploy' },
   { label: 'Pricing', to: '#pricing' },
   { label: 'FAQ', to: '#faq' },
 ])
 
-const sectionIds = ['features', 'deploy', 'pricing', 'faq'] as const
+const sectionIds = ['features', 'agents', 'deploy', 'pricing', 'faq'] as const
 let scrollFrame: number | undefined
 
 function syncHashToScroll() {
@@ -110,6 +111,14 @@ const faqItems: AccordionItem[] = [
   {
     label: 'Where is workspace data stored?',
     content: 'Messages and workspace data use D1, attachments use R2, and short-lived connection tickets use KV. These resources live in the Cloudflare account used for deployment.',
+  },
+  {
+    label: 'What runs the agents?',
+    content: 'Agents use Workers AI through the deployment\'s own AI binding. An agent profile stores a model id rather than a vendor key, so the workspace does not depend on an external AI provider account. Agent sandboxes use Cloudflare Containers, which is why the Workers Paid plan is required.',
+  },
+  {
+    label: 'How are Agent actions controlled?',
+    content: 'In Agent conversations, risky commands pause until an authorized member approves or rejects them. Agents are workspace members rather than sign-in identities, and configuring them requires workspace administration permission.',
   },
   {
     label: 'Can I try it before deploying?',
@@ -282,7 +291,7 @@ useHead({
         </UContainer>
       </section>
 
-      <section id="features" class="border-b border-muted py-20 sm:py-28">
+      <section id="features" class="scroll-mt-16 border-b border-muted py-20 sm:py-28">
         <UContainer>
           <div class="max-w-2xl">
             <p class="mb-3 text-sm font-medium text-primary">Built for one workspace</p>
@@ -311,6 +320,31 @@ useHead({
 
           <div class="border-t border-muted" />
 
+          <div id="agents" class="scroll-mt-16">
+            <DemoPanel
+              eyebrow="Agents"
+              title="Agents are members, not integrations."
+              description="Mention an agent in a channel or send it a direct message, and it answers in place. Each channel and thread keeps its own memory, so one conversation never leaks into another."
+              icon="i-ph-robot"
+              reverse
+            >
+              <AgentDemo />
+            </DemoPanel>
+          </div>
+
+          <div class="border-t border-muted" />
+
+          <DemoPanel
+            eyebrow="Tasks"
+            title="Hand off work that outlives the message."
+            description="Assign a task and every run executes as a durable Cloudflare Workflow—resumable after interruption, cancellable while running, and recorded with its configuration, progress, and result."
+            icon="i-ph-list-checks"
+          >
+            <TaskDemo />
+          </DemoPanel>
+
+          <div class="border-t border-muted" />
+
           <DemoPanel
             eyebrow="Voice huddles"
             title="Move from typing to talking."
@@ -323,7 +357,7 @@ useHead({
         </UContainer>
       </section>
 
-      <section id="deploy" class="border-b border-muted py-20 sm:py-28">
+      <section id="deploy" class="scroll-mt-16 border-b border-muted py-20 sm:py-28">
         <UContainer>
           <div class="grid items-start gap-14 lg:grid-cols-[1fr_1.05fr] lg:gap-20">
             <div>
@@ -356,7 +390,7 @@ useHead({
         </UContainer>
       </section>
 
-      <section id="pricing" class="border-b border-muted py-20 sm:py-28">
+      <section id="pricing" class="scroll-mt-16 border-b border-muted py-20 sm:py-28">
         <UContainer>
           <div class="mx-auto max-w-3xl text-center">
             <p class="mb-3 text-sm font-medium text-primary">Pricing</p>
@@ -387,7 +421,7 @@ useHead({
         </UContainer>
       </section>
 
-      <section id="faq" class="border-b border-muted py-20 sm:py-28">
+      <section id="faq" class="scroll-mt-16 border-b border-muted py-20 sm:py-28">
         <UContainer>
           <div class="grid gap-12 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20">
             <div>
