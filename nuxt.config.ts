@@ -27,8 +27,47 @@ export default defineNuxtConfig({
       ],
     },
   },
+  runtimeConfig: {
+    cloudflareOAuthClientId: '',
+    cloudflareOAuthClientSecret: '',
+    cloudflareOAuthScopes: [
+      'd1.read',
+      'd1.write',
+      'containers.read',
+      'containers.write',
+      'workers-kv-storage.read',
+      'workers-kv-storage.write',
+      'workers-r2.read',
+      'workers-r2.write',
+      'workers-scripts.read',
+      'workers-scripts.write',
+      'account-settings.read',
+      'memberships.read',
+    ].join(' '),
+    installerSessionPassword: '',
+    installerOrigin: 'https://discoflare.com',
+    installerManifestUrl: 'https://github.com/vnmtvlv/discoflare/releases/latest/download/discoflare-cloudflare-manifest.json',
+  },
+  nitro: {
+    preset: 'cloudflare-module',
+    cloudflare: {
+      nodeCompat: true,
+      deployConfig: false,
+    },
+    routeRules: {
+      '/api/**': {
+        headers: {
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+          'Referrer-Policy': 'no-referrer',
+        },
+      },
+    },
+  },
   routeRules: {
-    '/**': { prerender: true },
+    '/': { prerender: true },
+    '/privacy': { prerender: true },
+    '/terms': { prerender: true },
   },
   typescript: {
     strict: true,

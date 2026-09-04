@@ -35,12 +35,19 @@ Discoflare is free software released under the MIT License. There is no Discofla
 
 The current release is a web application. Desktop, iOS, and Android clients are planned but are not currently available.
 
+## Deployment
+
+The primary installer at [discoflare.com/deploy](https://discoflare.com/deploy) connects directly to Cloudflare and does not require GitHub. It can create a new workspace or update an existing Discoflare Worker while keeping its data resources. The Cloudflare Workers Paid plan is required because Discoflare agent sandboxes use Containers.
+
+The repository-based Cloudflare Deploy Button remains available as an alternative for people who prefer to own a GitHub or GitLab clone.
+
 ## Links
 
 - [Source repository](https://github.com/vnmtvlv/discoflare)
 - [Architecture documentation](https://github.com/vnmtvlv/discoflare/blob/main/docs/architecture.md)
 - [Deployment guide](https://github.com/vnmtvlv/discoflare/blob/main/docs/deployment.md)
 - [Public sandbox](https://sandbox.discoflare.com)
-- [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/vnmtvlv/discoflare)
+- [Deploy with Discoflare](https://discoflare.com/deploy)
+- [Deploy with GitHub](https://deploy.workers.cloudflare.com/?url=https://github.com/vnmtvlv/discoflare)
 - [Privacy policy](https://discoflare.com/privacy)
 - [Terms of use](https://discoflare.com/terms)

@@ -13,21 +13,22 @@ pnpm dev
 
 ```bash
 pnpm typecheck
-pnpm generate
+pnpm build
 ```
 
-The site is fully prerendered and the deployable output is written to `.output/public`.
+The marketing routes are prerendered. The Cloudflare OAuth installer under `/deploy` and `/api/cloudflare/**` runs in the Nuxt Worker.
 
 ## Deployment
 
 Cloudflare Workers Builds deploys the site automatically when a commit is pushed to `main`:
 
 ```bash
-pnpm generate
 pnpm deploy
 ```
 
 The Worker and `discoflare.com` custom domain are configured in [`wrangler.jsonc`](wrangler.jsonc).
+
+Production requires the secrets from `.env.example`. Register the OAuth callback as `https://discoflare.com/api/cloudflare/oauth/callback` and make the Cloudflare OAuth client public after verifying `discoflare.com`. Installed workspaces require the Cloudflare Workers Paid plan because they use Containers for agent sandboxes.
 
 ## Product demos
 

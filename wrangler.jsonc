@@ -1,7 +1,10 @@
 {
   "name": "discoflare-com",
+  "main": ".output/server/index.mjs",
   "compatibility_date": "2026-09-03",
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
+    "binding": "ASSETS",
     "directory": "./.output/public",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"

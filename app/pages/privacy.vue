@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const siteUrl = 'https://discoflare.com/privacy'
 const title = 'Privacy policy · Discoflare'
-const description = 'How the Discoflare marketing site handles information.'
+const description = 'How discoflare.com and its Cloudflare installer handle information.'
 
 useSeoMeta({
   title,
@@ -30,18 +30,24 @@ useHead({
 <template>
   <LegalPage
     title="Privacy policy"
-    description="How the Discoflare marketing site handles information."
-    effective-date="September 3, 2026"
+    description="How discoflare.com and its Cloudflare installer handle information."
+    effective-date="September 4, 2026"
   >
     <section>
       <h2>What this policy covers</h2>
-      <p>This policy covers discoflare.com, the public marketing site. A Discoflare workspace that you deploy, the public sandbox, Cloudflare, and GitHub operate separately and may have their own privacy practices.</p>
+      <p>This policy covers discoflare.com, including its Cloudflare installer. A Discoflare workspace that you deploy, the public sandbox, Cloudflare, and GitHub operate separately and may have their own privacy practices.</p>
     </section>
 
     <section>
       <h2>Information handled by this site</h2>
-      <p>This site does not offer accounts, forms, advertising, or analytics. It does not intentionally collect personal information. Your browser may save a local light or dark theme preference.</p>
+      <p>This site does not offer Discoflare accounts, advertising, or analytics. Your browser may save a local light or dark theme preference.</p>
       <p>Like most hosted websites, the infrastructure serving this site may process basic request data such as your IP address, browser type, requested URL, and time of access for security, reliability, and delivery.</p>
+    </section>
+
+    <section>
+      <h2>Cloudflare installer</h2>
+      <p>When you connect Cloudflare, discoflare.com temporarily keeps the OAuth access token in an encrypted, HTTP-only session cookie. The installer uses it to list the accounts you can access and to create or update the Cloudflare resources you request. The token is not stored in a Discoflare database and the session expires after one hour.</p>
+      <p>Owner name, email, and password are sent to Cloudflare as encrypted Worker secrets during a first installation. Discoflare.com does not intentionally retain those values after the deployment request. Disconnecting revokes the OAuth token and clears the installer session.</p>
     </section>
 
     <section>

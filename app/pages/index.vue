@@ -4,6 +4,7 @@ import type { AccordionItem, NavigationMenuItem } from '@nuxt/ui'
 const repoUrl = 'https://github.com/vnmtvlv/discoflare'
 const creatorUrl = 'https://github.com/vnmtvlv'
 const deployUrl = 'https://deploy.workers.cloudflare.com/?url=https://github.com/vnmtvlv/discoflare'
+const installerUrl = '/deploy'
 const sandboxUrl = 'https://sandbox.discoflare.com'
 const siteUrl = 'https://discoflare.com/'
 const websiteId = `${siteUrl}#website`
@@ -92,15 +93,15 @@ const features = [
 ]
 
 const deploySteps = [
-  { number: '01', title: 'Open the deploy flow', description: 'Cloudflare imports the public Discoflare repository.' },
-  { number: '02', title: 'Set the owner credentials', description: 'Add the required secrets and optional X or huddle configuration.' },
-  { number: '03', title: 'Open your workspace', description: 'Cloudflare provisions the declared services and starts Discoflare.' },
+  { number: '01', title: 'Connect Cloudflare', description: 'Choose the Cloudflare account that will own the workspace.' },
+  { number: '02', title: 'Install or update', description: 'Discoflare provisions the Worker and its Cloudflare resources.' },
+  { number: '03', title: 'Open your workspace', description: 'Use the generated workers.dev address immediately.' },
 ]
 
 const faqItems: AccordionItem[] = [
   {
     label: 'What do I need to run Discoflare?',
-    content: 'A Cloudflare account. The deploy flow creates the declared Worker, D1 database, R2 bucket, KV namespace, and Durable Objects. Voice huddles require separate RealtimeKit configuration.',
+    content: 'A Cloudflare account with the Workers Paid plan. The Discoflare installer does not require GitHub. The alternative repository-based flow requires a GitHub or GitLab account. Voice huddles require separate RealtimeKit configuration.',
   },
   {
     label: 'Is Discoflare free?',
@@ -256,10 +257,9 @@ useHead({
             </p>
             <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <UButton
-                :to="deployUrl"
-                target="_blank"
+                :to="installerUrl"
                 label="Deploy to Cloudflare"
-                trailing-icon="i-ph-arrow-up-right"
+                trailing-icon="i-ph-arrow-right"
                 size="xl"
               />
               <UButton
@@ -332,7 +332,10 @@ useHead({
               <p class="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
                 Discoflare deploys as one Nuxt Worker and connects the Cloudflare services declared by the project.
               </p>
-              <UButton :to="deployUrl" target="_blank" label="Deploy to Cloudflare" trailing-icon="i-ph-arrow-up-right" size="lg" class="mt-8" />
+              <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+                <UButton :to="installerUrl" label="Deploy with Discoflare" trailing-icon="i-ph-arrow-right" size="lg" />
+                <UButton :to="deployUrl" target="_blank" label="Deploy with GitHub" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" size="lg" />
+              </div>
             </div>
 
             <div>
@@ -403,7 +406,7 @@ useHead({
             <img src="/brand/logo-128.png" alt="" class="mx-auto size-16" width="64" height="64">
             <h2 class="display-title mx-auto mt-6 max-w-2xl text-4xl font-semibold text-highlighted sm:text-5xl">Bring your team chat home.</h2>
             <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <UButton :to="deployUrl" target="_blank" label="Deploy Discoflare" trailing-icon="i-ph-arrow-up-right" size="xl" />
+              <UButton :to="installerUrl" label="Deploy Discoflare" trailing-icon="i-ph-arrow-right" size="xl" />
               <UButton :to="repoUrl" target="_blank" label="Star on GitHub" icon="i-ph-star" color="neutral" variant="outline" size="xl" />
             </div>
           </div>
