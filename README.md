@@ -47,3 +47,7 @@ The docs site can be published from a private website repository. The alternativ
 ## Crawler and agent discovery
 
 `public/robots.txt` keeps the public site crawlable and points to `public/sitemap.xml`. `public/llms.txt` is the concise agent entry point and links to Markdown versions of the product, privacy, and terms pages. Keep those files aligned whenever the corresponding site content changes.
+
+## License
+
+The source code is available under the [MIT License](LICENSE). The Discoflare name, logos, artwork, screenshots, and marketing copy are not licensed for reuse by the MIT License.
