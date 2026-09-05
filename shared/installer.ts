@@ -29,6 +29,7 @@ export type DeployRequest = {
   mailEnabled: boolean
   mailSubdomain: string
   mailLocalPart: string
+  targetVersion?: string
 }
 
 export type DeployResponse = {
@@ -36,6 +37,41 @@ export type DeployResponse = {
   setupUrl?: string
   version: string
   updated: boolean
+  appliedMigrations: string[]
+  verified: boolean
+}
+
+export type CloudflareInstallation = {
+  accountId: string
+  workerName: string
+  origin: string
+  version: string | null
+  configuration: DeployRequest
+  resources: {
+    databaseId: string | null
+    bucketName: string | null
+    kvId: string | null
+    workflowName: string
+    containerName: string
+    mailZoneId: string | null
+    mailDomain: string | null
+    telemetryId: string | null
+  }
+}
+
+export type UninstallRequest = {
+  accountId: string
+  workerName: string
+  origin: string
+  confirmation: string
+  claim: string
+}
+
+export type UninstallResponse = {
+  origin: string
+  deletedResources: string[]
+  deletedObjects: number
+  remainingResources: string[]
 }
 
 export type ReleaseAsset = {

@@ -21,11 +21,15 @@ type ContainerApplication = {
   configuration?: Record<string, unknown>
 }
 
-type ExistingWorkerBinding = {
+export type ExistingWorkerBinding = {
   name: string
   type: string
   text?: string
   class_name?: string
+  database_id?: string
+  bucket_name?: string
+  namespace_id?: string
+  workflow_name?: string
 }
 
 type ExistingWorker = {
@@ -34,6 +38,10 @@ type ExistingWorker = {
   mailZoneId?: string
   mailDomain?: string
   appHostname?: string
+  databaseId?: string
+  bucketName?: string
+  kvId?: string
+  telemetryId?: string
 }
 
 type EmailRoutingSettings = { enabled?: boolean; status?: string }
@@ -41,14 +49,15 @@ type EmailCatchAll = { enabled?: boolean; actions?: Array<{ type?: string; value
 type DnsRecord = { name?: string; content?: string; type?: string }
 type SendingSubdomain = { name: string; enabled: boolean }
 type WorkerDomain = { hostname: string; service: string }
+type DeploymentHealth = { version?: string; ok?: boolean; ready?: boolean; migrated?: boolean }
 
-const installerMarker = 'discoflare.com/v1'
+export const installerMarker = 'discoflare.com/v1'
 
 function mailDomain(request: DeployRequest) {
   return `${request.mailSubdomain}.${request.zoneName}`
 }
 
-function isDiscoflareWorker(bindings: ExistingWorkerBinding[]) {
+export function isDiscoflareWorker(bindings: ExistingWorkerBinding[]) {
   const marker = bindings.find(binding => binding.name === 'DISCOFLARE_INSTALLATION')
   if (marker?.type === 'plain_text' && marker.text === installerMarker) return true
 
@@ -86,6 +95,10 @@ async function inspectWorker(client: Cloudflare, accountId: string, workerName: 
       mailZoneId: text('MAIL_ZONE_ID'),
       mailDomain: text('MAIL_DOMAIN'),
       appHostname: text('DISCOFLARE_APP_HOSTNAME') || text('MAIL_APP_HOSTNAME'),
+      databaseId: bindings.find(binding => binding.name === 'DB' && binding.type === 'd1')?.database_id,
+      bucketName: bindings.find(binding => binding.name === 'FILES' && binding.type === 'r2_bucket')?.bucket_name,
+      kvId: bindings.find(binding => binding.name === 'TICKETS' && binding.type === 'kv_namespace')?.namespace_id,
+      telemetryId: text('DISCOFLARE_TELEMETRY_ID'),
     }
   }
   return { exists: false }
@@ -203,6 +216,17 @@ function sqlString(value: string) {
 }
 
 async function applyD1Migrations(accessToken: string, accountId: string, databaseId: string, payload: InstallerAssetsPayload) {
+  const names = new Set<string>()
+  for (const migration of payload.migrations) {
+    if (!/^[0-9A-Za-z_.-]+$/.test(migration.name)) {
+      throw createError({ statusCode: 502, statusMessage: `Discoflare migration ${migration.name} has an invalid name` })
+    }
+    if (names.has(migration.name)) {
+      throw createError({ statusCode: 502, statusMessage: `Discoflare migration ${migration.name} is duplicated` })
+    }
+    names.add(migration.name)
+  }
+
   await cloudflareApi(accessToken, `/accounts/${accountId}/d1/database/${databaseId}/query`, {
     method: 'POST',
     body: JSON.stringify({ sql: 'CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);' }),
@@ -213,14 +237,30 @@ async function applyD1Migrations(accessToken: string, accountId: string, databas
     { method: 'POST', body: JSON.stringify({ sql: 'SELECT name FROM d1_migrations;' }) },
   )
   const applied = new Set(rows.flatMap(result => result.results || []).map(row => row.name).filter(Boolean))
+  const pending: string[] = []
   for (const migration of payload.migrations) {
-    if (!/^[0-9A-Za-z_.-]+$/.test(migration.name) || applied.has(migration.name)) continue
+    if (applied.has(migration.name)) continue
     const sql = `${migration.sql.replaceAll('--> statement-breakpoint', '\n')}\nINSERT INTO d1_migrations (name) VALUES (${sqlString(migration.name)});`
-    await cloudflareApi(accessToken, `/accounts/${accountId}/d1/database/${databaseId}/query`, {
+    const result = await cloudflareApi<Array<{ success?: boolean }>>(accessToken, `/accounts/${accountId}/d1/database/${databaseId}/query`, {
       method: 'POST',
       body: JSON.stringify({ sql }),
     })
+    if (!result.length || result.some(statement => statement.success === false)) {
+      throw createError({ statusCode: 502, statusMessage: `Discoflare migration ${migration.name} did not complete` })
+    }
+    pending.push(migration.name)
   }
+  if (pending.length) {
+    const verified = await cloudflareApi<Array<{ results?: Array<{ name?: string }> }>>(
+      accessToken,
+      `/accounts/${accountId}/d1/database/${databaseId}/query`,
+      { method: 'POST', body: JSON.stringify({ sql: 'SELECT name FROM d1_migrations;' }) },
+    )
+    const recorded = new Set(verified.flatMap(result => result.results || []).map(row => row.name).filter(Boolean))
+    const missing = pending.find(name => !recorded.has(name))
+    if (missing) throw createError({ statusCode: 502, statusMessage: `Discoflare migration ${missing} was not recorded` })
+  }
+  return pending
 }
 
 async function uploadAssets(accessToken: string, accountId: string, workerName: string, payload: InstallerAssetsPayload) {
@@ -286,6 +326,7 @@ async function uploadWorker(
   resources: { databaseId: string, bucketName: string, kvId: string, assetsJwt: string, origin: string },
   existing: ExistingWorker,
   ownerSetupToken: string | null,
+  telemetry: { installationId: string, token: string },
 ) {
   const bindings: Array<Record<string, unknown>> = [
     { type: 'd1', name: 'DB', database_id: resources.databaseId },
@@ -297,13 +338,16 @@ async function uploadWorker(
     { type: 'plain_text', name: 'PUBLIC_ORIGIN', text: resources.origin },
     { type: 'plain_text', name: 'APP_NAME', text: request.appName },
     { type: 'plain_text', name: 'ADMIN_WORKSPACE', text: request.appName },
-    { type: 'plain_text', name: 'APP_TITLE', text: 'One workspace for humans, agents, and tasks.' },
+    { type: 'plain_text', name: 'APP_TITLE', text: 'One workspace for humans and agents.' },
     { type: 'plain_text', name: 'APP_SUBTITLE', text: 'Built on your Cloudflare stack.' },
     { type: 'plain_text', name: 'AUTH_REGISTRATION_MODE', text: request.registrationMode },
     { type: 'plain_text', name: 'AGENT_MODEL', text: '@cf/moonshotai/kimi-k2.7-code' },
     { type: 'plain_text', name: 'DISCOFLARE_APP_HOSTNAME', text: `${request.appSubdomain}.${request.zoneName}` },
     { type: 'plain_text', name: 'DISCOFLARE_INSTALLATION', text: installerMarker },
     { type: 'plain_text', name: 'DISCOFLARE_VERSION', text: manifest.version },
+    { type: 'plain_text', name: 'DISCOFLARE_TELEMETRY_ID', text: telemetry.installationId },
+    { type: 'plain_text', name: 'DISCOFLARE_TELEMETRY_ENDPOINT', text: 'https://discoflare.com/api/telemetry/heartbeat' },
+    { type: 'secret_text', name: 'DISCOFLARE_TELEMETRY_TOKEN', text: telemetry.token },
     ...manifest.durableObjects.map(item => ({ type: 'durable_object_namespace', name: item.binding, class_name: item.className })),
   ]
   if (request.mailEnabled) {
@@ -411,6 +455,31 @@ async function deployContainer(
   })
 }
 
+async function verifyDeployment(origin: string, version: string, expectReady: boolean) {
+  let lastStatus = 0
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 500))
+    try {
+      const response = await fetch(`${origin}/api/setup/health`, {
+        headers: { Accept: 'application/json' },
+        redirect: 'error',
+        cache: 'no-store',
+      })
+      lastStatus = response.status
+      if (!response.ok) continue
+      const health = await response.json() as DeploymentHealth
+      if (health.version === version && health.ok && health.migrated && (!expectReady || health.ready)) return true
+    }
+    catch {
+      // Deployment propagation can briefly leave the custom hostname unavailable.
+    }
+  }
+  throw createError({
+    statusCode: 502,
+    statusMessage: `Discoflare ${version} was deployed, but workspace health verification did not complete${lastStatus ? ` (${lastStatus})` : ''}`,
+  })
+}
+
 export async function deployDiscoflare(
   client: Cloudflare,
   accessToken: string,
@@ -448,12 +517,21 @@ export async function deployDiscoflare(
     }
   }
   const ownerSetupToken = existing.exists ? null : randomBase64Url(32)
-  const [databaseId, bucketName, kvId] = await Promise.all([
-    ensureD1(client, request.accountId, `${request.workerName}-db`),
-    ensureR2(client, request.accountId, `${request.workerName}-files`),
-    ensureKv(client, request.accountId, `${request.workerName}-tickets`),
-  ])
-  await applyD1Migrations(accessToken, request.accountId, databaseId, release.assets)
+  const telemetry = {
+    installationId: existing.telemetryId || crypto.randomUUID(),
+    token: randomBase64Url(32),
+  }
+  const [databaseId, bucketName, kvId] = existing.exists
+    ? [existing.databaseId, existing.bucketName, existing.kvId]
+    : await Promise.all([
+        ensureD1(client, request.accountId, `${request.workerName}-db`),
+        ensureR2(client, request.accountId, `${request.workerName}-files`),
+        ensureKv(client, request.accountId, `${request.workerName}-tickets`),
+      ])
+  if (!databaseId || !bucketName || !kvId) {
+    throw createError({ statusCode: 409, statusMessage: 'Existing Discoflare storage bindings are incomplete' })
+  }
+  const appliedMigrations = await applyD1Migrations(accessToken, request.accountId, databaseId, release.assets)
   const assetsJwt = await uploadAssets(accessToken, request.accountId, request.workerName, release.assets)
   const origin = `https://${request.appSubdomain}.${request.zoneName}`
   const uploaded = await uploadWorker(accessToken, request.accountId, request, release.manifest, release.worker, {
@@ -462,7 +540,7 @@ export async function deployDiscoflare(
     kvId,
     assetsJwt,
     origin,
-  }, existing, ownerSetupToken)
+  }, existing, ownerSetupToken, telemetry)
   await client.workers.scripts.subdomain.create(request.workerName, {
     account_id: request.accountId,
     enabled: true,
@@ -477,10 +555,18 @@ export async function deployDiscoflare(
     await attachMailCatchAll(accessToken, request)
   }
   await deployContainer(accessToken, request.accountId, request.workerName, uploaded.deployment_id || uploaded.id, release.manifest)
+  await client.workers.scripts.schedules.update(request.workerName, {
+    account_id: request.accountId,
+    body: [{ cron: '17 4 * * 1' }],
+  })
+  await verifyDeployment(origin, release.manifest.version, existing.exists)
   return {
     url: origin,
     setupUrl: ownerSetupToken ? `${origin}/setup#claim=${encodeURIComponent(ownerSetupToken)}` : undefined,
     version: release.manifest.version,
     updated: existing.exists,
+    appliedMigrations,
+    verified: true,
+    telemetry,
   }
 }

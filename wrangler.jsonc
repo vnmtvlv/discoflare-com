@@ -9,6 +9,13 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
   },
+  "d1_databases": [
+    {
+      "binding": "TELEMETRY_DB",
+      "database_name": "discoflare-com-telemetry",
+      "migrations_dir": "migrations"
+    }
+  ],
   "routes": [
     {
       "pattern": "discoflare.com",

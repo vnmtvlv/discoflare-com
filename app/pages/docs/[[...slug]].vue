@@ -40,7 +40,14 @@ useHead({
 </script>
 
 <template>
-  <UPage v-if="page">
+  <UPage
+    v-if="page"
+    :ui="{
+      root: 'flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_13.5rem] lg:gap-10',
+      center: 'lg:col-span-1',
+      right: 'lg:col-span-1 order-first lg:order-last',
+    }"
+  >
     <UPageHeader :title="page.title" :description="page.description" />
 
     <UPageBody>
@@ -51,7 +58,11 @@ useHead({
     </UPageBody>
 
     <template #right>
-      <UContentToc :links="page.body?.toc?.links || []" highlight />
+      <UContentToc
+        :links="page.body?.toc?.links || []"
+        highlight
+        :ui="{ title: 'whitespace-normal text-clip', linkText: 'whitespace-normal text-clip' }"
+      />
     </template>
   </UPage>
 </template>

@@ -1,18 +1,29 @@
 ---
 title: Documentation
-description: Deploy, configure, verify, and operate a Discoflare workspace.
+description: Learn the Discoflare apps and Agents, deploy a workspace, and operate it with observable checks.
 navigation:
   icon: i-ph-book-open-text
 ---
 
-Discoflare is a self-hosted workspace for channels, threads, files, agents, tasks, and optional voice huddles. It runs in the workspace owner's Cloudflare account.
+Discoflare is a self-hosted workspace for people and Agents. Chat, Tasks, Mail, and Databases share one workspace, one permission model, and data stored in the workspace owner's Cloudflare account.
 
 ## Start here
 
+- [Understand the workspace](/docs/product-guide) explains how apps, members, permissions, and shared data fit together.
+- [Explore the apps](/docs/product-guide/apps) covers the released Chat, Tasks, Mail, and Databases surfaces.
+- [Create and use Agents](/docs/product-guide/agents) covers profiles, conversations, models, Sandboxes, and approval boundaries.
+- [Run Agent tasks](/docs/product-guide/tasks) covers boards, assignment, durable runs, results, and recovery.
 - [Choose a deployment](/docs/getting-started/deployment-options) compares the guided installer with the manual GitHub/Workers Builds path.
 - [Deploy to Cloudflare](/docs/installation/cloudflare) covers the complete runtime, including Agents.
 - [Environment variables](/docs/configuration/environment-variables) is the configuration reference.
 - [Verify an installation](/docs/operations/verification) separates service health, setup state, persistence, and browser checks.
+- [Read the roadmap](/docs/roadmap) separates released behavior, active development, and longer-term direction.
+
+## Product guides
+
+The product guides describe behavior visible to workspace members and operators. They start with the app switcher, then follow the two ways an Agent can participate: a conversation in Chat or an assigned run in Tasks.
+
+Roadmap pages use explicit status labels. An item marked **In development** is not part of a released installation until it appears in a tagged release and passes the relevant verification checks.
 
 ## Configuration is explicit
 
@@ -32,4 +43,4 @@ Every installation guide ends with observable checks. A successful build or depl
 
 The [Discoflare repository](https://github.com/vnmtvlv/discoflare) owns the application, Cloudflare configuration, migrations, and maintainer documentation. This site documents released behavior for operators and users.
 
-When the source documentation and this site disagree, check the version you installed and use the documentation shipped with that release.
+When the source documentation and this site disagree, check the version you installed and use the documentation shipped with that release. Roadmap pages describe direction, not behavior that an installed release can be expected to provide.

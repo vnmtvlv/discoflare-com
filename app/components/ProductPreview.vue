@@ -1,29 +1,78 @@
 <script setup lang="ts">
-const screenshots = [
+/**
+ * Hero gallery: one screenshot per released workspace surface.
+ *
+ * To add or replace a shot, drop a 1600x1000 JPG at the `src` path below and
+ * remove that surface's `pending` flag. A surface still marked `pending` — or
+ * whose file fails to load — keeps its tab and shows the placeholder image, so
+ * the gallery never renders a broken image or loses a button.
+ * See public/screenshots/README.md.
+ */
+const placeholder = {
+  src: '/screenshots/chat.jpg',
+  alt: 'Discoflare chat with a channel message, an attachment, and a discussion thread open',
+}
+
+const surfaces = [
   {
-    label: 'Design review',
-    src: '/screenshots/design-review-thread.jpg',
-    alt: 'Discoflare design review channel with an attachment and a discussion thread open',
+    id: 'chat',
+    label: 'Chat',
+    icon: 'i-ph-chats-circle',
+    src: '/screenshots/chat.jpg',
+    alt: 'Discoflare chat with a channel message, an attachment, and a discussion thread open',
   },
   {
-    label: 'Launch',
-    src: '/screenshots/launch-coordination.jpg',
-    alt: 'Discoflare product launch channel with a reply thread open',
+    id: 'mail',
+    label: 'Mail',
+    icon: 'i-ph-envelope-simple',
+    src: '/screenshots/mail.jpg',
+    alt: 'Discoflare Mail showing a shared domain mailbox and an email conversation',
+    pending: true,
   },
   {
-    label: 'Campaign',
-    src: '/screenshots/campaign-assets.jpg',
-    alt: 'Discoflare marketing channel with campaign artwork shared in chat',
+    id: 'agents',
+    label: 'Agents',
+    icon: 'i-ph-robot',
+    src: '/screenshots/agents.jpg',
+    alt: 'Discoflare agent answering in a channel with its activity state visible',
+    pending: true,
   },
   {
-    label: 'Files',
-    src: '/screenshots/customer-story-files.jpg',
-    alt: 'Discoflare customer stories channel showing shared files',
+    id: 'tasks',
+    label: 'Tasks',
+    icon: 'i-ph-list-checks',
+    src: '/screenshots/tasks.jpg',
+    alt: 'Discoflare Tasks board with columns and a running agent task',
+    pending: true,
+  },
+  {
+    id: 'databases',
+    label: 'Databases',
+    icon: 'i-ph-table',
+    src: '/screenshots/databases.jpg',
+    alt: 'Discoflare database with typed custom fields and records in a table',
+    pending: true,
   },
 ] as const
 
-const activeIndex = ref(0)
-const activeScreenshot = computed(() => screenshots[activeIndex.value] ?? screenshots[0])
+type SurfaceId = (typeof surfaces)[number]['id']
+
+/** Filled at runtime when an image 404s, so a missing file falls back instead of breaking the hero. */
+const failed = ref(new Set<SurfaceId>())
+
+const activeId = ref<SurfaceId>(surfaces[0].id)
+const activeSurface = computed(() => surfaces.find(surface => surface.id === activeId.value) ?? surfaces[0])
+
+/** A pending or broken surface borrows the placeholder, alt text included. */
+const activeImage = computed(() => {
+  const surface = activeSurface.value
+  const usePlaceholder = ('pending' in surface && surface.pending) || failed.value.has(surface.id)
+  return usePlaceholder ? placeholder : { src: surface.src, alt: surface.alt }
+})
+
+function onImageError(id: SurfaceId) {
+  failed.value = new Set(failed.value).add(id)
+}
 </script>
 
 <template>
@@ -31,35 +80,37 @@ const activeScreenshot = computed(() => screenshots[activeIndex.value] ?? screen
     <div class="aspect-[8/5] overflow-hidden bg-[#292a2e]">
       <Transition name="hero-screenshot" mode="out-in">
         <img
-          :key="activeScreenshot.src"
-          :src="activeScreenshot.src"
-          :alt="activeScreenshot.alt"
+          :key="activeSurface.id"
+          :src="activeImage.src"
+          :alt="activeImage.alt"
           width="1600"
           height="1000"
           class="size-full object-contain"
           decoding="async"
           fetchpriority="high"
+          @error="onImageError(activeSurface.id)"
         >
       </Transition>
     </div>
 
     <div
-      class="flex items-center justify-center gap-1.5 border-t border-default p-2 sm:gap-2 sm:p-3"
+      class="flex items-center justify-center gap-1.5 overflow-x-auto border-t border-default p-2 sm:gap-2 sm:p-3"
       role="group"
       aria-label="Product screenshots"
     >
       <button
-        v-for="(screenshot, index) in screenshots"
-        :key="screenshot.src"
+        v-for="surface in surfaces"
+        :key="surface.id"
         type="button"
-        :aria-pressed="activeIndex === index"
-        class="rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors sm:px-3"
-        :class="activeIndex === index
+        :aria-pressed="activeId === surface.id"
+        class="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors sm:px-3"
+        :class="activeId === surface.id
           ? 'bg-accented text-highlighted'
           : 'text-muted hover:bg-muted hover:text-highlighted'"
-        @click="activeIndex = index"
+        @click="activeId = surface.id"
       >
-        {{ screenshot.label }}
+        <UIcon :name="surface.icon" class="hidden size-3.5 sm:block" />
+        {{ surface.label }}
       </button>
     </div>
   </div>

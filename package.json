@@ -8,7 +8,9 @@
   },
   "scripts": {
     "build": "nuxt build",
-    "deploy": "pnpm build && pnpm dlx wrangler@4.128.0 deploy",
+    "deploy": "pnpm build && pnpm db:migrate && pnpm dlx wrangler@4.128.0 deploy",
+    "db:create": "pnpm dlx wrangler@4.128.0 d1 create discoflare-com-telemetry",
+    "db:migrate": "pnpm dlx wrangler@4.128.0 d1 migrations apply TELEMETRY_DB --remote",
     "dev": "nuxt dev",
     "generate": "nuxt generate --preset=static",
     "postinstall": "nuxt prepare",

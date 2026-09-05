@@ -6,6 +6,12 @@ type TokenResponse = {
   expires_in?: number
 }
 
+function returnWithError(returnTo: string, error: string) {
+  const url = new URL(returnTo, 'https://discoflare.invalid')
+  url.searchParams.set('error', error)
+  return `${url.pathname}${url.search}`
+}
+
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const session = await useInstallerSession(event)
@@ -14,12 +20,12 @@ export default defineEventHandler(async (event) => {
 
   if (query.error) {
     await session.clear()
-    return sendRedirect(event, `${returnTo}?error=${encodeURIComponent(String(query.error))}`)
+    return sendRedirect(event, returnWithError(returnTo, String(query.error)))
   }
 
   if (!pending || typeof query.code !== 'string' || query.state !== pending.state) {
     await session.clear()
-    return sendRedirect(event, `${returnTo}?error=oauth_state`)
+    return sendRedirect(event, returnWithError(returnTo, 'oauth_state'))
   }
 
   const config = oauthConfig(event)
@@ -40,13 +46,13 @@ export default defineEventHandler(async (event) => {
 
   if (!response.ok) {
     await session.clear()
-    return sendRedirect(event, `${returnTo}?error=oauth_exchange`)
+    return sendRedirect(event, returnWithError(returnTo, 'oauth_exchange'))
   }
 
   const token = await response.json() as TokenResponse
   if (!token.access_token) {
     await session.clear()
-    return sendRedirect(event, `${returnTo}?error=oauth_token`)
+    return sendRedirect(event, returnWithError(returnTo, 'oauth_token'))
   }
 
   await session.update({

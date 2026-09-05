@@ -13,7 +13,7 @@ const docsNavigation = computed(() => {
 <template>
   <div class="min-h-screen bg-default text-default">
     <UHeader
-      to="/docs"
+      to="/"
       title="Discoflare Docs"
       :menu="{ title: 'Documentation navigation', description: 'Browse the Discoflare documentation.' }"
       class="border-b border-muted/70 bg-default/80 backdrop-blur-xl"
@@ -33,10 +33,9 @@ const docsNavigation = computed(() => {
         <UContentSearchButton :collapsed="true" />
         <UColorModeButton color="neutral" variant="ghost" />
         <UButton
-          :to="repoUrl"
-          target="_blank"
-          label="GitHub"
-          icon="i-ph-github-logo"
+          to="/"
+          label="Back to site"
+          icon="i-ph-arrow-left"
           color="neutral"
           variant="ghost"
           class="hidden sm:inline-flex"
@@ -46,16 +45,26 @@ const docsNavigation = computed(() => {
       <template #body>
         <UContentNavigation :navigation="docsNavigation" highlight class="-mx-2.5" />
         <USeparator class="my-5" />
-        <UButton to="/" label="Back to Discoflare" trailing-icon="i-ph-arrow-left" color="neutral" variant="ghost" block />
+        <UButton to="/" label="Back to site" icon="i-ph-arrow-left" color="neutral" variant="ghost" block />
       </template>
     </UHeader>
 
     <UMain>
       <UContainer>
-        <UPage>
+        <UPage
+          :ui="{
+            root: 'flex flex-col lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-10',
+            left: 'lg:col-span-1',
+            center: 'lg:col-span-1',
+          }"
+        >
           <template #left>
             <UPageAside>
-              <UContentNavigation :navigation="docsNavigation" highlight />
+              <UContentNavigation
+                :navigation="docsNavigation"
+                highlight
+                :ui="{ linkTitle: 'whitespace-normal text-clip' }"
+              />
             </UPageAside>
           </template>
 
@@ -66,15 +75,16 @@ const docsNavigation = computed(() => {
 
     <UFooter class="border-t border-muted">
       <template #left><BrandLogo /></template>
-      <p class="text-xs text-muted">Documentation for released Discoflare behavior.</p>
+      <p class="text-xs text-muted">Product, operator, and roadmap documentation.</p>
       <template #right>
         <UButton to="/" label="Home" color="neutral" variant="ghost" />
+        <UButton :to="repoUrl" target="_blank" aria-label="Discoflare on GitHub" icon="i-ph-github-logo" color="neutral" variant="ghost" />
       </template>
     </UFooter>
 
     <UContentSearch
       title="Search documentation"
-      description="Find setup steps, environment variables, and operational checks."
+      description="Find product guides, Agent behavior, setup steps, roadmap items, and operational checks."
       :navigation="docsNavigation"
       :files="searchSections || []"
     />

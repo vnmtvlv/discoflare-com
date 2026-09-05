@@ -4,8 +4,6 @@ defineProps<{
   description: string
   effectiveDate: string
 }>()
-
-const creatorUrl = 'https://github.com/vnmtvlv'
 </script>
 
 <template>
@@ -40,7 +38,6 @@ const creatorUrl = 'https://github.com/vnmtvlv'
       <template #left>
         <BrandLogo />
       </template>
-      <p class="text-center text-xs text-muted">by <a :href="creatorUrl" target="_blank" rel="noopener noreferrer" class="hover:text-highlighted">vnmtvlv</a></p>
       <template #right>
         <nav aria-label="Legal" class="flex items-center gap-3 text-sm text-muted">
           <NuxtLink to="/privacy" class="hover:text-highlighted">Privacy</NuxtLink>

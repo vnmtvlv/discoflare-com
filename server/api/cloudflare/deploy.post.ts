@@ -5,6 +5,7 @@ import { installerConfig } from '../../utils/installer-config'
 import { loadDiscoflareRelease } from '../../utils/discoflare-release'
 import { requireCloudflareToken } from '../../utils/installer-session'
 import { assertInstallerMutation } from '../../utils/installer-security'
+import { recordInstallerDeployment } from '../../utils/telemetry-registry'
 
 function parseRequest(value: unknown): DeployRequest {
   const body = value as Partial<DeployRequest> | null
@@ -31,6 +32,10 @@ function parseRequest(value: unknown): DeployRequest {
   if (body.registrationMode !== 'invite_only' && body.registrationMode !== 'open') {
     throw createError({ statusCode: 400, statusMessage: 'Select a registration mode' })
   }
+  const targetVersion = typeof body.targetVersion === 'string' && /^v?\d+\.\d+\.\d+$/.test(body.targetVersion)
+    ? body.targetVersion
+    : undefined
+  if (body.targetVersion && !targetVersion) throw createError({ statusCode: 400, statusMessage: 'Invalid Discoflare release version' })
   return {
     accountId,
     workerName,
@@ -43,6 +48,7 @@ function parseRequest(value: unknown): DeployRequest {
     mailEnabled,
     mailSubdomain,
     mailLocalPart,
+    targetVersion,
   }
 }
 
@@ -59,10 +65,29 @@ export default defineEventHandler(async (event): Promise<DeployResponse> => {
     throw createError({ statusCode: 403, statusMessage: 'Cloudflare domain is unavailable in this account' })
   }
 
-  const manifestUrl = installerConfig(event).installerManifestUrl
+  const manifestUrl = request.targetVersion
+    ? `https://github.com/vnmtvlv/discoflare/releases/download/${request.targetVersion}/discoflare-cloudflare-manifest.json`
+    : installerConfig(event).installerManifestUrl
   if (typeof manifestUrl !== 'string' || !manifestUrl.startsWith('https://')) {
     throw createError({ statusCode: 503, statusMessage: 'Discoflare release source is not configured' })
   }
   const release = await loadDiscoflareRelease(manifestUrl)
-  return deployDiscoflare(client, accessToken, request, release)
+  if (request.targetVersion && release.manifest.version !== request.targetVersion.replace(/^v/, '')) {
+    throw createError({ statusCode: 502, statusMessage: 'Discoflare release manifest version does not match the requested upgrade' })
+  }
+  const deployed = await deployDiscoflare(client, accessToken, request, release)
+  try {
+    await recordInstallerDeployment(event, {
+      ...deployed.telemetry,
+      accountId: request.accountId,
+      workerName: request.workerName,
+      version: deployed.version,
+      email: request.mailEnabled,
+    })
+  }
+  catch (error) {
+    console.warn('Discoflare installed, but anonymous installation telemetry could not be recorded', error)
+  }
+  const { telemetry: _telemetry, ...response } = deployed
+  return response
 })
