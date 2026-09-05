@@ -17,6 +17,7 @@ const form = reactive<DeployRequest>({
   zoneId: '',
   zoneName: '',
   appSubdomain: 'discoflare',
+  mailEnabled: true,
   mailSubdomain: 'discoflare',
   mailLocalPart: 'inbox',
 })
@@ -76,8 +77,8 @@ useSeoMeta({
 
 <template>
   <div class="min-h-screen bg-default text-default">
-    <UHeader class="border-b border-muted/70 bg-default/80 backdrop-blur-xl">
-      <template #title><BrandLogo /></template>
+    <UHeader to="/" title="Discoflare" class="border-b border-muted/70 bg-default/80 backdrop-blur-xl">
+      <template #title><BrandLogo :linked="false" /></template>
       <template #right>
         <UColorModeButton color="neutral" variant="ghost" />
         <UButton to="/" label="Back home" trailing-icon="i-ph-arrow-left" color="neutral" variant="ghost" />
@@ -90,34 +91,37 @@ useSeoMeta({
           <p class="text-sm font-medium text-primary">Cloudflare installer</p>
           <h1 class="display-title mt-3 text-4xl font-semibold text-highlighted sm:text-6xl">Deploy Discoflare</h1>
           <p class="mt-4 max-w-xl text-sm text-muted">Requires the Cloudflare Workers Paid plan because Discoflare agent sandboxes use Containers.</p>
+          <p class="mt-2 max-w-xl text-sm text-muted">The GitHub option is a manual source-based deployment. You configure the Cloudflare resources, bindings, secrets, hostname, migrations, and optional integrations yourself.</p>
+          <p class="mt-2 max-w-xl text-sm text-muted">Cloudflare connection requests email-management permission up front. Turning Workspace email off later prevents this installer from changing email routing or creating mail bindings.</p>
 
-          <div v-if="status === 'pending'" class="mt-10 flex items-center gap-3 text-muted">
-            <UIcon name="i-ph-spinner-gap" class="size-5 animate-spin" />
-            Checking Cloudflare connection
-          </div>
+          <ClientOnly>
+            <div v-if="status === 'pending'" class="mt-10 flex items-center gap-3 text-muted">
+              <UIcon name="i-ph-spinner-gap" class="size-5 animate-spin" />
+              Checking Cloudflare connection
+            </div>
 
-          <div v-else-if="!session.connected" class="mt-10 grid gap-3 sm:grid-cols-2">
-            <UButton
-              to="/api/cloudflare/oauth/start?returnTo=/deploy"
-              external
-              label="Connect Cloudflare"
-              trailing-icon="i-ph-arrow-right"
-              size="xl"
-              block
-            />
-            <UButton
-              :to="githubDeployUrl"
-              target="_blank"
-              label="Deploy with GitHub"
-              trailing-icon="i-ph-arrow-up-right"
-              color="neutral"
-              variant="outline"
-              size="xl"
-              block
-            />
-          </div>
+            <div v-else-if="!session.connected" class="mt-10 grid gap-3 sm:grid-cols-2">
+              <UButton
+                to="/api/cloudflare/oauth/start?returnTo=/deploy"
+                external
+                label="Connect Cloudflare"
+                trailing-icon="i-ph-arrow-right"
+                size="xl"
+                block
+              />
+              <UButton
+                :to="githubDeployUrl"
+                target="_blank"
+                label="Deploy with GitHub"
+                trailing-icon="i-ph-arrow-up-right"
+                color="neutral"
+                variant="outline"
+                size="xl"
+                block
+              />
+            </div>
 
-          <form v-else class="mt-10 space-y-8" @submit.prevent="deploy">
+            <form v-else class="mt-10 space-y-8" @submit.prevent="deploy">
             <UCard :ui="{ body: 'space-y-5 p-6 sm:p-8' }">
               <div class="flex items-center justify-between gap-4">
                 <h2 class="text-lg font-semibold text-highlighted">Cloudflare</h2>
@@ -157,6 +161,15 @@ useSeoMeta({
                     <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template>
                   </UInput>
                 </UFormField>
+              </div>
+
+              <USwitch
+                v-model="form.mailEnabled"
+                label="Workspace email"
+                description="Create a mailbox and assign this domain's catch-all email route to this workspace."
+              />
+
+              <div v-if="form.mailEnabled" class="grid gap-5 sm:grid-cols-2">
                 <UFormField label="Email subdomain" required>
                   <UInput v-model="form.mailSubdomain" autocomplete="off" class="w-full">
                     <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template>
@@ -170,11 +183,18 @@ useSeoMeta({
               </div>
 
               <UAlert
-                v-if="form.zoneName"
+                v-if="form.zoneName && form.mailEnabled"
                 color="warning"
                 variant="subtle"
                 :title="`Email for ${mailDomain} will be handled by Discoflare`"
                 :description="`The installer enables Cloudflare Email Routing, attaches ${appHostname}, and creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`"
+              />
+              <UAlert
+                v-else-if="form.zoneName"
+                color="neutral"
+                variant="subtle"
+                title="Email routing stays unchanged"
+                description="No mailbox or email bindings are created. Existing routes, including another workspace's catch-all, remain untouched."
               />
 
               <UFormField label="Registration" required>
@@ -212,7 +232,7 @@ useSeoMeta({
                 trailing-icon="i-ph-cloud-arrow-up"
                 size="xl"
                 :loading="deploying"
-                :disabled="!form.accountId || !form.zoneId || !form.appSubdomain || !form.mailSubdomain || !form.mailLocalPart || !form.adminEmail"
+                :disabled="!form.accountId || !form.zoneId || !form.appSubdomain || (form.mailEnabled && (!form.mailSubdomain || !form.mailLocalPart)) || !form.adminEmail"
               />
               <UButton
                 :to="githubDeployUrl"
@@ -224,7 +244,15 @@ useSeoMeta({
                 size="xl"
               />
             </div>
-          </form>
+            </form>
+
+            <template #fallback>
+              <div class="mt-10 flex items-center gap-3 text-muted">
+                <UIcon name="i-ph-spinner-gap" class="size-5 animate-spin" />
+                Checking Cloudflare connection
+              </div>
+            </template>
+          </ClientOnly>
         </div>
       </UContainer>
     </main>

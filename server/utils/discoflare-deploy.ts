@@ -85,7 +85,7 @@ async function inspectWorker(client: Cloudflare, accountId: string, workerName: 
       migrationTag: worker.migration_tag,
       mailZoneId: text('MAIL_ZONE_ID'),
       mailDomain: text('MAIL_DOMAIN'),
-      appHostname: text('MAIL_APP_HOSTNAME'),
+      appHostname: text('DISCOFLARE_APP_HOSTNAME') || text('MAIL_APP_HOSTNAME'),
     }
   }
   return { exists: false }
@@ -120,16 +120,18 @@ async function ensureKv(client: Cloudflare, accountId: string, title: string) {
 
 async function assertDomainAvailable(accessToken: string, request: DeployRequest) {
   const hostname = `${request.appSubdomain}.${request.zoneName}`
-  const requestedMailDomain = mailDomain(request)
-  const [domains, mxRecords, routing] = await Promise.all([
-    cloudflareApi<WorkerDomain[]>(accessToken, `/accounts/${request.accountId}/workers/domains`),
-    cloudflareApi<DnsRecord[]>(accessToken, `/zones/${request.zoneId}/dns_records?type=MX&name=${encodeURIComponent(requestedMailDomain)}&per_page=100`),
-    cloudflareApi<EmailRoutingSettings>(accessToken, `/zones/${request.zoneId}/email/routing`),
-  ])
+  const domains = await cloudflareApi<WorkerDomain[]>(accessToken, `/accounts/${request.accountId}/workers/domains`)
   const attached = domains.find(domain => domain.hostname.toLowerCase() === hostname)
   if (attached && attached.service !== request.workerName) {
     throw createError({ statusCode: 409, statusMessage: `${hostname} is already attached to Worker ${attached.service}` })
   }
+  if (!request.mailEnabled) return
+
+  const requestedMailDomain = mailDomain(request)
+  const [mxRecords, routing] = await Promise.all([
+    cloudflareApi<DnsRecord[]>(accessToken, `/zones/${request.zoneId}/dns_records?type=MX&name=${encodeURIComponent(requestedMailDomain)}&per_page=100`),
+    cloudflareApi<EmailRoutingSettings>(accessToken, `/zones/${request.zoneId}/email/routing`),
+  ])
   const foreignMx = mxRecords.filter(record => !String(record.content || '').toLowerCase().endsWith('.mx.cloudflare.net'))
   if (foreignMx.length) {
     throw createError({
@@ -290,7 +292,6 @@ async function uploadWorker(
     { type: 'r2_bucket', name: 'FILES', bucket_name: resources.bucketName },
     { type: 'kv_namespace', name: 'TICKETS', namespace_id: resources.kvId },
     { type: 'ai', name: 'AI' },
-    { type: 'send_email', name: 'MAIL_EMAIL' },
     { type: 'assets', name: 'ASSETS' },
     { type: 'workflow', name: manifest.workflow.binding, workflow_name: `${request.workerName}-agent-tasks`, class_name: manifest.workflow.className },
     { type: 'plain_text', name: 'PUBLIC_ORIGIN', text: resources.origin },
@@ -299,15 +300,21 @@ async function uploadWorker(
     { type: 'plain_text', name: 'APP_TITLE', text: 'One workspace for humans, agents, and tasks.' },
     { type: 'plain_text', name: 'APP_SUBTITLE', text: 'Built on your Cloudflare stack.' },
     { type: 'plain_text', name: 'AUTH_REGISTRATION_MODE', text: request.registrationMode },
-    { type: 'plain_text', name: 'MAIL_DOMAIN', text: mailDomain(request) },
-    { type: 'plain_text', name: 'MAIL_ZONE_ID', text: request.zoneId },
-    { type: 'plain_text', name: 'MAIL_APP_HOSTNAME', text: `${request.appSubdomain}.${request.zoneName}` },
-    { type: 'plain_text', name: 'MAIL_DEFAULT_LOCAL_PART', text: request.mailLocalPart },
     { type: 'plain_text', name: 'AGENT_MODEL', text: '@cf/moonshotai/kimi-k2.7-code' },
+    { type: 'plain_text', name: 'DISCOFLARE_APP_HOSTNAME', text: `${request.appSubdomain}.${request.zoneName}` },
     { type: 'plain_text', name: 'DISCOFLARE_INSTALLATION', text: installerMarker },
     { type: 'plain_text', name: 'DISCOFLARE_VERSION', text: manifest.version },
     ...manifest.durableObjects.map(item => ({ type: 'durable_object_namespace', name: item.binding, class_name: item.className })),
   ]
+  if (request.mailEnabled) {
+    bindings.push(
+      { type: 'send_email', name: 'MAIL_EMAIL' },
+      { type: 'plain_text', name: 'MAIL_DOMAIN', text: mailDomain(request) },
+      { type: 'plain_text', name: 'MAIL_ZONE_ID', text: request.zoneId },
+      { type: 'plain_text', name: 'MAIL_APP_HOSTNAME', text: `${request.appSubdomain}.${request.zoneName}` },
+      { type: 'plain_text', name: 'MAIL_DEFAULT_LOCAL_PART', text: request.mailLocalPart },
+    )
+  }
   if (!existing.exists) {
     if (!ownerSetupToken) throw createError({ statusCode: 500, statusMessage: 'Owner setup token was not generated' })
     bindings.push(
@@ -414,10 +421,21 @@ export async function deployDiscoflare(
   const existing = await inspectWorker(client, request.accountId, request.workerName)
   const requestedHostname = `${request.appSubdomain}.${request.zoneName}`
   const requestedMailDomain = mailDomain(request)
-  if (existing.mailZoneId && (
+  if (existing.appHostname && existing.appHostname !== requestedHostname) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `This Discoflare installation already owns ${existing.appHostname}. Domain moves require removing the old Cloudflare route first.`,
+    })
+  }
+  if (existing.exists && Boolean(existing.mailZoneId) !== request.mailEnabled) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Changing workspace email on an existing installation requires a manual migration.',
+    })
+  }
+  if (request.mailEnabled && existing.mailZoneId && (
     existing.mailZoneId !== request.zoneId
     || existing.mailDomain !== requestedMailDomain
-    || existing.appHostname !== requestedHostname
   )) {
     throw createError({
       statusCode: 409,
@@ -451,11 +469,13 @@ export async function deployDiscoflare(
     previews_enabled: true,
   })
   await attachAppDomain(accessToken, request)
-  await Promise.all([
-    ensureEmailRouting(accessToken, request),
-    ensureEmailSending(accessToken, request),
-  ])
-  await attachMailCatchAll(accessToken, request)
+  if (request.mailEnabled) {
+    await Promise.all([
+      ensureEmailRouting(accessToken, request),
+      ensureEmailSending(accessToken, request),
+    ])
+    await attachMailCatchAll(accessToken, request)
+  }
   await deployContainer(accessToken, request.accountId, request.workerName, uploaded.deployment_id || uploaded.id, release.manifest)
   return {
     url: origin,

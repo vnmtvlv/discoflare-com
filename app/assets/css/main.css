@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+@source "../../../content/**/*";
+
 @theme static {
   --color-cloudflare-50: #fff7ed;
   --color-cloudflare-100: #ffedd5;

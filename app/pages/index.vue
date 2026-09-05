@@ -19,6 +19,7 @@ const navigation = computed<NavigationMenuItem[]>(() => [
   { label: 'Features', to: '#features' },
   { label: 'Agents', to: '#agents' },
   { label: 'Deploy', to: '#deploy' },
+  { label: 'Docs', to: '/docs' },
   { label: 'Pricing', to: '#pricing' },
   { label: 'FAQ', to: '#faq' },
 ])
@@ -96,13 +97,13 @@ const features = [
 const deploySteps = [
   { number: '01', title: 'Connect Cloudflare', description: 'Choose the Cloudflare account that will own the workspace.' },
   { number: '02', title: 'Install or update', description: 'Discoflare provisions the Worker and its Cloudflare resources.' },
-  { number: '03', title: 'Open your workspace', description: 'Use the generated workers.dev address immediately.' },
+  { number: '03', title: 'Open your workspace', description: 'Create the first owner on the configured workspace hostname.' },
 ]
 
 const faqItems: AccordionItem[] = [
   {
     label: 'What do I need to run Discoflare?',
-    content: 'A Cloudflare account with the Workers Paid plan. The Discoflare installer does not require GitHub. The alternative repository-based flow requires a GitHub or GitLab account. Voice huddles require separate RealtimeKit configuration.',
+    content: 'A Cloudflare account with the Workers Paid plan. The Discoflare installer does not require GitHub. The alternative repository-based flow requires a GitHub account and manual Cloudflare resource, binding, secret, hostname, and migration setup. Voice huddles require separate RealtimeKit configuration.',
   },
   {
     label: 'Is Discoflare free?',
@@ -222,9 +223,9 @@ useHead({
 
 <template>
   <div class="min-h-screen overflow-x-clip bg-default text-default">
-    <UHeader class="border-b border-muted/70 bg-default/80 backdrop-blur-xl">
+    <UHeader to="/" title="Discoflare" class="border-b border-muted/70 bg-default/80 backdrop-blur-xl">
       <template #title>
-        <BrandLogo />
+        <BrandLogo :linked="false" />
       </template>
 
       <UNavigationMenu :items="navigation" class="hidden lg:flex" />
@@ -361,7 +362,7 @@ useHead({
         <UContainer>
           <div class="grid items-start gap-14 lg:grid-cols-[1fr_1.05fr] lg:gap-20">
             <div>
-              <p class="mb-3 text-sm font-medium text-primary">One-click deployment</p>
+              <p class="mb-3 text-sm font-medium text-primary">Cloudflare deployment</p>
               <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">Your workspace. Your account.</h2>
               <p class="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
                 Discoflare deploys as one Nuxt Worker and connects the Cloudflare services declared by the project.
@@ -370,6 +371,7 @@ useHead({
                 <UButton :to="installerUrl" label="Deploy with Discoflare" trailing-icon="i-ph-arrow-right" size="lg" />
                 <UButton :to="deployUrl" target="_blank" label="Deploy with GitHub" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" size="lg" />
               </div>
+              <p class="mt-3 max-w-xl text-sm leading-6 text-muted">The GitHub method connects source to Workers Builds. You configure and verify every account-specific Cloudflare resource, binding, secret, hostname, and migration manually.</p>
             </div>
 
             <div>
@@ -453,6 +455,7 @@ useHead({
         <BrandLogo />
       </template>
       <nav aria-label="Legal" class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted">
+        <NuxtLink to="/docs" class="transition-colors hover:text-highlighted">Docs</NuxtLink>
         <NuxtLink to="/privacy" class="transition-colors hover:text-highlighted">Privacy</NuxtLink>
         <NuxtLink to="/terms" class="transition-colors hover:text-highlighted">Terms</NuxtLink>
         <span>

@@ -36,6 +36,12 @@ Demo sections use coded previews until real product recordings are ready. See [`
 
 Brand assets are copied from the Discoflare product repository so this site can deploy independently.
 
+## Documentation
+
+Public operator documentation lives in `content/docs` and is rendered at `/docs` with Nuxt Content. Documentation routes are prerendered explicitly because the same Worker also serves the dynamic Cloudflare installer.
+
+The docs site can be published from a private website repository. The alternative Cloudflare Deploy Button builds from the separate public Discoflare application repository and requires manual Cloudflare account setup.
+
 ## Crawler and agent discovery
 
 `public/robots.txt` keeps the public site crawlable and points to `public/sitemap.xml`. `public/llms.txt` is the concise agent entry point and links to Markdown versions of the product, privacy, and terms pages. Keep those files aligned whenever the corresponding site content changes.

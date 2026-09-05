@@ -11,8 +11,9 @@ Discoflare is MIT-licensed software. Each deployment creates one workspace witho
 
 ## Documentation
 
-- [Architecture](https://github.com/vnmtvlv/discoflare/blob/main/docs/architecture.md): Runtime topology, Cloudflare services, data ownership, and request flows.
-- [Deployment guide](https://github.com/vnmtvlv/discoflare/blob/main/docs/deployment.md): Required credentials, optional integrations, provisioning, and readiness checks.
+- [Discoflare documentation](https://discoflare.com/docs): Guided and manual Cloudflare deployment, configuration, verification, backups, and upgrades.
+- [Architecture source](https://github.com/vnmtvlv/discoflare/blob/main/docs/architecture.md): Runtime topology, Cloudflare services, data ownership, and request flows.
+- [Deployment source](https://github.com/vnmtvlv/discoflare/blob/main/docs/deployment.md): Maintainer-level deployment details and release procedures.
 
 ## Policies
 
@@ -23,4 +24,4 @@ Discoflare is MIT-licensed software. Each deployment creates one workspace witho
 
 - [Human-readable website](https://discoflare.com/): The canonical Discoflare product website.
 - [Public sandbox](https://sandbox.discoflare.com): A hosted workspace for trying Discoflare before deploying it.
-- [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/vnmtvlv/discoflare): Browser-based one-click deployment into a Cloudflare account.
+- [Deploy with GitHub](https://deploy.workers.cloudflare.com/?url=https://github.com/vnmtvlv/discoflare): Source-based deployment that requires manual Cloudflare resource and account configuration.

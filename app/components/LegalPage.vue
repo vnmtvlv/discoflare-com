@@ -10,9 +10,9 @@ const creatorUrl = 'https://github.com/vnmtvlv'
 
 <template>
   <div class="min-h-screen bg-default text-default">
-    <UHeader class="border-b border-muted/70 bg-default/80 backdrop-blur-xl">
+    <UHeader to="/" title="Discoflare" class="border-b border-muted/70 bg-default/80 backdrop-blur-xl">
       <template #title>
-        <BrandLogo />
+        <BrandLogo :linked="false" />
       </template>
 
       <template #right>

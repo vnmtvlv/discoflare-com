@@ -1,7 +1,22 @@
+import { readdirSync } from 'node:fs'
+
+const docsRoutes = readdirSync(new URL('./content/docs', import.meta.url), { recursive: true, encoding: 'utf8' })
+  .filter(path => path.endsWith('.md'))
+  .map((path) => {
+    const segments = path
+      .replaceAll('\\', '/')
+      .replace(/\.md$/, '')
+      .split('/')
+      .map(segment => segment.replace(/^\d+\./, ''))
+    if (segments.at(-1) === 'index') segments.pop()
+    return `/docs${segments.length ? `/${segments.join('/')}` : ''}`
+  })
+  .sort()
+
 export default defineNuxtConfig({
   compatibilityDate: '2026-09-02',
   devtools: { enabled: false },
-  modules: ['@nuxt/ui'],
+  modules: ['@nuxt/ui', '@nuxt/content'],
   css: ['~/assets/css/main.css'],
   colorMode: {
     preference: 'dark',
@@ -72,9 +87,15 @@ export default defineNuxtConfig({
         },
       },
     },
+    prerender: {
+      crawlLinks: false,
+      routes: docsRoutes,
+    },
   },
   routeRules: {
     '/': { prerender: true },
+    '/docs': { prerender: true },
+    '/docs/**': { prerender: true },
     '/privacy': { prerender: true },
     '/terms': { prerender: true },
   },

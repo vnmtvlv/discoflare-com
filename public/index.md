@@ -44,7 +44,7 @@ The current release is a web application. Desktop, iOS, and Android clients are 
 
 The primary installer at [discoflare.com/deploy](https://discoflare.com/deploy) connects directly to Cloudflare and does not require GitHub. It can create a new workspace or update an existing Discoflare Worker while keeping its data resources. The Cloudflare Workers Paid plan is required because Discoflare agent sandboxes use Containers.
 
-The repository-based Cloudflare Deploy Button remains available as an alternative for people who prefer to own a GitHub or GitLab clone.
+The repository-based Cloudflare Deploy Button remains available for people who prefer to own a GitHub fork. It is a manual path: the operator must configure the Cloudflare resources, bindings, secrets, build commands, hostname, migrations, and optional integrations, then verify the deployed Worker.
 
 ## Links
 

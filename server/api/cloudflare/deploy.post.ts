@@ -15,6 +15,7 @@ function parseRequest(value: unknown): DeployRequest {
   const zoneId = String(body.zoneId || '').trim()
   const zoneName = String(body.zoneName || '').trim().toLowerCase()
   const appSubdomain = String(body.appSubdomain || '').trim().toLowerCase()
+  const mailEnabled = body.mailEnabled !== false
   const mailSubdomain = String(body.mailSubdomain || '').trim().toLowerCase()
   const mailLocalPart = String(body.mailLocalPart || '').trim().toLowerCase()
   if (!/^[0-9a-f]{32}$/.test(accountId)) throw createError({ statusCode: 400, statusMessage: 'Select a Cloudflare account' })
@@ -25,8 +26,8 @@ function parseRequest(value: unknown): DeployRequest {
   if (!/^[0-9a-f]{32}$/.test(zoneId)) throw createError({ statusCode: 400, statusMessage: 'Select a Cloudflare domain' })
   if (!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(zoneName)) throw createError({ statusCode: 400, statusMessage: 'Invalid Cloudflare domain' })
   if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(appSubdomain)) throw createError({ statusCode: 400, statusMessage: 'App subdomain must use lowercase letters, numbers, and hyphens' })
-  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(mailSubdomain)) throw createError({ statusCode: 400, statusMessage: 'Email subdomain must use lowercase letters, numbers, and hyphens' })
-  if (!/^[a-z0-9](?:[a-z0-9.!#$%&'*+/=?^_`{|}~-]{0,62}[a-z0-9])?$/.test(mailLocalPart)) throw createError({ statusCode: 400, statusMessage: 'Enter a valid default mailbox' })
+  if (mailEnabled && !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(mailSubdomain)) throw createError({ statusCode: 400, statusMessage: 'Email subdomain must use lowercase letters, numbers, and hyphens' })
+  if (mailEnabled && !/^[a-z0-9](?:[a-z0-9.!#$%&'*+/=?^_`{|}~-]{0,62}[a-z0-9])?$/.test(mailLocalPart)) throw createError({ statusCode: 400, statusMessage: 'Enter a valid default mailbox' })
   if (body.registrationMode !== 'invite_only' && body.registrationMode !== 'open') {
     throw createError({ statusCode: 400, statusMessage: 'Select a registration mode' })
   }
@@ -39,6 +40,7 @@ function parseRequest(value: unknown): DeployRequest {
     zoneId,
     zoneName,
     appSubdomain,
+    mailEnabled,
     mailSubdomain,
     mailLocalPart,
   }
