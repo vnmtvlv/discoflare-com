@@ -44,6 +44,10 @@ type WorkerDomain = { hostname: string; service: string }
 
 const installerMarker = 'discoflare.com/v1'
 
+function mailDomain(request: DeployRequest) {
+  return `${request.mailSubdomain}.${request.zoneName}`
+}
+
 function isDiscoflareWorker(bindings: ExistingWorkerBinding[]) {
   const marker = bindings.find(binding => binding.name === 'DISCOFLARE_INSTALLATION')
   if (marker?.type === 'plain_text' && marker.text === installerMarker) return true
@@ -116,9 +120,10 @@ async function ensureKv(client: Cloudflare, accountId: string, title: string) {
 
 async function assertDomainAvailable(accessToken: string, request: DeployRequest) {
   const hostname = `${request.appSubdomain}.${request.zoneName}`
+  const requestedMailDomain = mailDomain(request)
   const [domains, mxRecords, routing] = await Promise.all([
     cloudflareApi<WorkerDomain[]>(accessToken, `/accounts/${request.accountId}/workers/domains`),
-    cloudflareApi<DnsRecord[]>(accessToken, `/zones/${request.zoneId}/dns_records?type=MX&name=${encodeURIComponent(request.zoneName)}&per_page=100`),
+    cloudflareApi<DnsRecord[]>(accessToken, `/zones/${request.zoneId}/dns_records?type=MX&name=${encodeURIComponent(requestedMailDomain)}&per_page=100`),
     cloudflareApi<EmailRoutingSettings>(accessToken, `/zones/${request.zoneId}/email/routing`),
   ])
   const attached = domains.find(domain => domain.hostname.toLowerCase() === hostname)
@@ -129,7 +134,7 @@ async function assertDomainAvailable(accessToken: string, request: DeployRequest
   if (foreignMx.length) {
     throw createError({
       statusCode: 409,
-      statusMessage: `${request.zoneName} already has mail exchange records. Discoflare will not replace another mail provider.`,
+      statusMessage: `${requestedMailDomain} already has mail exchange records. Discoflare will not replace another mail provider.`,
     })
   }
   if (routing.enabled) {
@@ -145,17 +150,25 @@ async function assertDomainAvailable(accessToken: string, request: DeployRequest
 }
 
 async function ensureEmailRouting(accessToken: string, request: DeployRequest) {
-  const routing = await cloudflareApi<EmailRoutingSettings>(accessToken, `/zones/${request.zoneId}/email/routing`)
-  if (routing.enabled && routing.status === 'ready') return
-  await cloudflareApi(accessToken, `/zones/${request.zoneId}/email/routing/dns`, { method: 'POST' })
+  const requestedMailDomain = mailDomain(request)
+  const mxRecords = await cloudflareApi<DnsRecord[]>(
+    accessToken,
+    `/zones/${request.zoneId}/dns_records?type=MX&name=${encodeURIComponent(requestedMailDomain)}&per_page=100`,
+  )
+  if (mxRecords.some(record => String(record.content || '').toLowerCase().endsWith('.mx.cloudflare.net'))) return
+  await cloudflareApi(accessToken, `/zones/${request.zoneId}/email/routing/dns`, {
+    method: 'POST',
+    body: JSON.stringify({ name: requestedMailDomain }),
+  })
 }
 
 async function ensureEmailSending(accessToken: string, request: DeployRequest) {
+  const requestedMailDomain = mailDomain(request)
   const domains = await cloudflareApi<SendingSubdomain[]>(accessToken, `/zones/${request.zoneId}/email/sending/subdomains`)
-  if (domains.some(domain => domain.name.toLowerCase() === request.zoneName && domain.enabled)) return
+  if (domains.some(domain => domain.name.toLowerCase() === requestedMailDomain && domain.enabled)) return
   await cloudflareApi(accessToken, `/zones/${request.zoneId}/email/sending/subdomains`, {
     method: 'POST',
-    body: JSON.stringify({ name: request.zoneName }),
+    body: JSON.stringify({ name: requestedMailDomain }),
   })
 }
 
@@ -175,7 +188,7 @@ async function attachMailCatchAll(accessToken: string, request: DeployRequest) {
   await cloudflareApi(accessToken, `/zones/${request.zoneId}/email/routing/rules/catch_all`, {
     method: 'PUT',
     body: JSON.stringify({
-      name: 'Discoflare workspace mail',
+      name: `Discoflare workspace mail for ${mailDomain(request)}`,
       enabled: true,
       matchers: [{ type: 'all' }],
       actions: [{ type: 'worker', value: [request.workerName] }],
@@ -284,7 +297,7 @@ async function uploadWorker(
     { type: 'plain_text', name: 'APP_TITLE', text: 'One workspace for humans, agents, and tasks.' },
     { type: 'plain_text', name: 'APP_SUBTITLE', text: 'Built on your Cloudflare stack.' },
     { type: 'plain_text', name: 'AUTH_REGISTRATION_MODE', text: request.registrationMode },
-    { type: 'plain_text', name: 'MAIL_DOMAIN', text: request.zoneName },
+    { type: 'plain_text', name: 'MAIL_DOMAIN', text: mailDomain(request) },
     { type: 'plain_text', name: 'MAIL_ZONE_ID', text: request.zoneId },
     { type: 'plain_text', name: 'MAIL_APP_HOSTNAME', text: `${request.appSubdomain}.${request.zoneName}` },
     { type: 'plain_text', name: 'MAIL_DEFAULT_LOCAL_PART', text: request.mailLocalPart },
@@ -398,9 +411,10 @@ export async function deployDiscoflare(
   await assertDomainAvailable(accessToken, request)
   const existing = await inspectWorker(client, request.accountId, request.workerName)
   const requestedHostname = `${request.appSubdomain}.${request.zoneName}`
+  const requestedMailDomain = mailDomain(request)
   if (existing.mailZoneId && (
     existing.mailZoneId !== request.zoneId
-    || existing.mailDomain !== request.zoneName
+    || existing.mailDomain !== requestedMailDomain
     || existing.appHostname !== requestedHostname
   )) {
     throw createError({

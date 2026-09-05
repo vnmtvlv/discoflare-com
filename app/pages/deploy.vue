@@ -19,6 +19,7 @@ const form = reactive<DeployRequest>({
   zoneId: '',
   zoneName: '',
   appSubdomain: 'discoflare',
+  mailSubdomain: 'discoflare',
   mailLocalPart: 'inbox',
 })
 const deploying = ref(false)
@@ -31,7 +32,12 @@ watch(() => session.value.accounts, (accounts) => {
 
 const accountZones = computed(() => session.value.zones.filter(zone => zone.accountId === form.accountId && zone.status === 'active'))
 const appHostname = computed(() => form.zoneName ? `${form.appSubdomain}.${form.zoneName}` : '')
-const mailboxAddress = computed(() => form.zoneName ? `${form.mailLocalPart}@${form.zoneName}` : '')
+const mailDomain = computed(() => form.zoneName ? `${form.mailSubdomain}.${form.zoneName}` : '')
+const mailboxAddress = computed(() => mailDomain.value ? `${form.mailLocalPart}@${mailDomain.value}` : '')
+
+watch(() => form.appSubdomain, (subdomain, previous) => {
+  if (!form.mailSubdomain || form.mailSubdomain === previous) form.mailSubdomain = subdomain
+})
 
 watch([() => form.accountId, accountZones], ([, zones]) => {
   if (!zones.some(zone => zone.id === form.zoneId)) form.zoneId = zones[0]?.id || ''
@@ -154,9 +160,14 @@ useSeoMeta({
                     <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template>
                   </UInput>
                 </UFormField>
+                <UFormField label="Email subdomain" required>
+                  <UInput v-model="form.mailSubdomain" autocomplete="off" class="w-full">
+                    <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template>
+                  </UInput>
+                </UFormField>
                 <UFormField label="First mailbox" required>
                   <UInput v-model="form.mailLocalPart" autocomplete="off" class="w-full">
-                    <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">@{{ form.zoneName }}</span></template>
+                    <template #trailing><span v-if="mailDomain" class="text-xs text-muted">@{{ mailDomain }}</span></template>
                   </UInput>
                 </UFormField>
               </div>
@@ -165,7 +176,7 @@ useSeoMeta({
                 v-if="form.zoneName"
                 color="warning"
                 variant="subtle"
-                :title="`Email for ${form.zoneName} will be handled by Discoflare`"
+                :title="`Email for ${mailDomain} will be handled by Discoflare`"
                 :description="`The installer enables Cloudflare Email Routing, attaches ${appHostname}, and creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`"
               />
 
@@ -210,7 +221,7 @@ useSeoMeta({
                 trailing-icon="i-ph-cloud-arrow-up"
                 size="xl"
                 :loading="deploying"
-                :disabled="!form.accountId || !form.zoneId || !form.appSubdomain || !form.mailLocalPart"
+                :disabled="!form.accountId || !form.zoneId || !form.appSubdomain || !form.mailSubdomain || !form.mailLocalPart"
               />
               <UButton
                 :to="githubDeployUrl"

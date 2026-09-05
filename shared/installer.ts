@@ -28,6 +28,7 @@ export type DeployRequest = {
   zoneId: string
   zoneName: string
   appSubdomain: string
+  mailSubdomain: string
   mailLocalPart: string
 }
 
