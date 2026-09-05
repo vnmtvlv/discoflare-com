@@ -5,7 +5,7 @@ const githubDeployUrl = 'https://deploy.workers.cloudflare.com/?url=https://gith
 const route = useRoute()
 const { data: session, status, refresh } = await useFetch<InstallerSessionResponse>('/api/cloudflare/session', {
   server: false,
-  default: () => ({ connected: false, accounts: [] }),
+  default: () => ({ connected: false, accounts: [], zones: [] }),
 })
 
 const form = reactive<DeployRequest>({
@@ -16,6 +16,10 @@ const form = reactive<DeployRequest>({
   adminName: 'Owner',
   appName: 'Discoflare',
   registrationMode: 'invite_only',
+  zoneId: '',
+  zoneName: '',
+  appSubdomain: 'discoflare',
+  mailLocalPart: 'inbox',
 })
 const deploying = ref(false)
 const result = ref<DeployResponse | null>(null)
@@ -23,6 +27,18 @@ const error = ref(typeof route.query.error === 'string' ? 'Cloudflare connection
 
 watch(() => session.value.accounts, (accounts) => {
   if (!form.accountId && accounts[0]) form.accountId = accounts[0].id
+}, { immediate: true })
+
+const accountZones = computed(() => session.value.zones.filter(zone => zone.accountId === form.accountId && zone.status === 'active'))
+const appHostname = computed(() => form.zoneName ? `${form.appSubdomain}.${form.zoneName}` : '')
+const mailboxAddress = computed(() => form.zoneName ? `${form.mailLocalPart}@${form.zoneName}` : '')
+
+watch([() => form.accountId, accountZones], ([, zones]) => {
+  if (!zones.some(zone => zone.id === form.zoneId)) form.zoneId = zones[0]?.id || ''
+}, { immediate: true })
+
+watch(() => form.zoneId, (zoneId) => {
+  form.zoneName = session.value.zones.find(zone => zone.id === zoneId)?.name || ''
 }, { immediate: true })
 
 async function disconnect() {
@@ -122,6 +138,37 @@ useSeoMeta({
                 <UInput v-model="form.appName" autocomplete="organization" class="w-full" />
               </UFormField>
 
+              <UFormField label="Domain" required hint="Must be active in the selected Cloudflare account.">
+                <USelect
+                  v-model="form.zoneId"
+                  :items="accountZones.map(zone => ({ label: zone.name, value: zone.id }))"
+                  value-key="value"
+                  class="w-full"
+                  placeholder="Select a domain"
+                />
+              </UFormField>
+
+              <div class="grid gap-5 sm:grid-cols-2">
+                <UFormField label="Discoflare subdomain" required>
+                  <UInput v-model="form.appSubdomain" autocomplete="off" class="w-full">
+                    <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template>
+                  </UInput>
+                </UFormField>
+                <UFormField label="First mailbox" required>
+                  <UInput v-model="form.mailLocalPart" autocomplete="off" class="w-full">
+                    <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">@{{ form.zoneName }}</span></template>
+                  </UInput>
+                </UFormField>
+              </div>
+
+              <UAlert
+                v-if="form.zoneName"
+                color="warning"
+                variant="subtle"
+                :title="`Email for ${form.zoneName} will be handled by Discoflare`"
+                :description="`The installer enables Cloudflare Email Routing, attaches ${appHostname}, and creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`"
+              />
+
               <UFormField label="Registration" required>
                 <URadioGroup
                   v-model="form.registrationMode"
@@ -163,7 +210,7 @@ useSeoMeta({
                 trailing-icon="i-ph-cloud-arrow-up"
                 size="xl"
                 :loading="deploying"
-                :disabled="!form.accountId"
+                :disabled="!form.accountId || !form.zoneId || !form.appSubdomain || !form.mailLocalPart"
               />
               <UButton
                 :to="githubDeployUrl"

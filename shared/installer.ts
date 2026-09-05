@@ -4,9 +4,17 @@ export type CloudflareAccount = {
   type: 'standard' | 'enterprise'
 }
 
+export type CloudflareZone = {
+  id: string
+  accountId: string
+  name: string
+  status: string
+}
+
 export type InstallerSessionResponse = {
   connected: boolean
   accounts: CloudflareAccount[]
+  zones: CloudflareZone[]
 }
 
 export type DeployRequest = {
@@ -17,6 +25,10 @@ export type DeployRequest = {
   adminName: string
   appName: string
   registrationMode: 'invite_only' | 'open'
+  zoneId: string
+  zoneName: string
+  appSubdomain: string
+  mailLocalPart: string
 }
 
 export type DeployResponse = {

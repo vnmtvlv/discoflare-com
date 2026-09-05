@@ -12,11 +12,19 @@ function parseRequest(value: unknown): DeployRequest {
   const accountId = String(body.accountId || '').trim()
   const workerName = String(body.workerName || '').trim().toLowerCase()
   const appName = String(body.appName || '').trim()
+  const zoneId = String(body.zoneId || '').trim()
+  const zoneName = String(body.zoneName || '').trim().toLowerCase()
+  const appSubdomain = String(body.appSubdomain || '').trim().toLowerCase()
+  const mailLocalPart = String(body.mailLocalPart || '').trim().toLowerCase()
   if (!/^[0-9a-f]{32}$/.test(accountId)) throw createError({ statusCode: 400, statusMessage: 'Select a Cloudflare account' })
   if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(workerName)) {
     throw createError({ statusCode: 400, statusMessage: 'Worker name must use lowercase letters, numbers, and hyphens' })
   }
   if (!appName || appName.length > 80) throw createError({ statusCode: 400, statusMessage: 'App name must be 1–80 characters' })
+  if (!/^[0-9a-f]{32}$/.test(zoneId)) throw createError({ statusCode: 400, statusMessage: 'Select a Cloudflare domain' })
+  if (!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(zoneName)) throw createError({ statusCode: 400, statusMessage: 'Invalid Cloudflare domain' })
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(appSubdomain)) throw createError({ statusCode: 400, statusMessage: 'App subdomain must use lowercase letters, numbers, and hyphens' })
+  if (!/^[a-z0-9](?:[a-z0-9.!#$%&'*+/=?^_`{|}~-]{0,62}[a-z0-9])?$/.test(mailLocalPart)) throw createError({ statusCode: 400, statusMessage: 'Enter a valid default mailbox' })
   if (body.registrationMode !== 'invite_only' && body.registrationMode !== 'open') {
     throw createError({ statusCode: 400, statusMessage: 'Select a registration mode' })
   }
@@ -28,6 +36,10 @@ function parseRequest(value: unknown): DeployRequest {
     adminEmail: String(body.adminEmail || '').trim().toLowerCase().slice(0, 254),
     adminPassword: String(body.adminPassword || '').slice(0, 256),
     adminName: String(body.adminName || '').trim().slice(0, 80),
+    zoneId,
+    zoneName,
+    appSubdomain,
+    mailLocalPart,
   }
 }
 
@@ -39,6 +51,10 @@ export default defineEventHandler(async (event): Promise<DeployResponse> => {
 
   const account = await client.accounts.get({ account_id: request.accountId })
   if (account.id !== request.accountId) throw createError({ statusCode: 403, statusMessage: 'Cloudflare account is unavailable' })
+  const zone = await client.zones.get({ zone_id: request.zoneId })
+  if (zone.id !== request.zoneId || zone.name !== request.zoneName || zone.account?.id !== request.accountId) {
+    throw createError({ statusCode: 403, statusMessage: 'Cloudflare domain is unavailable in this account' })
+  }
 
   const manifestUrl = installerConfig(event).installerManifestUrl
   if (typeof manifestUrl !== 'string' || !manifestUrl.startsWith('https://')) {

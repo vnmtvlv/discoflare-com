@@ -31,7 +31,16 @@ type ExistingWorkerBinding = {
 type ExistingWorker = {
   exists: boolean
   migrationTag?: string
+  mailZoneId?: string
+  mailDomain?: string
+  appHostname?: string
 }
+
+type EmailRoutingSettings = { enabled?: boolean; status?: string }
+type EmailCatchAll = { enabled?: boolean; actions?: Array<{ type?: string; value?: string[] }> }
+type DnsRecord = { name?: string; content?: string; type?: string }
+type SendingSubdomain = { name: string; enabled: boolean }
+type WorkerDomain = { hostname: string; service: string }
 
 const installerMarker = 'discoflare.com/v1'
 
@@ -65,7 +74,15 @@ async function inspectWorker(client: Cloudflare, accountId: string, workerName: 
     if (!isDiscoflareWorker(settings.bindings as ExistingWorkerBinding[] || [])) {
       throw createError({ statusCode: 409, statusMessage: `A non-Discoflare Worker named ${workerName} already exists` })
     }
-    return { exists: true, migrationTag: worker.migration_tag }
+    const bindings = settings.bindings as ExistingWorkerBinding[] || []
+    const text = (name: string) => bindings.find(binding => binding.name === name && binding.type === 'plain_text')?.text
+    return {
+      exists: true,
+      migrationTag: worker.migration_tag,
+      mailZoneId: text('MAIL_ZONE_ID'),
+      mailDomain: text('MAIL_DOMAIN'),
+      appHostname: text('MAIL_APP_HOSTNAME'),
+    }
   }
   return { exists: false }
 }
@@ -95,6 +112,75 @@ async function ensureKv(client: Cloudflare, accountId: string, title: string) {
     if (namespace.title === title) return namespace.id
   }
   return (await client.kv.namespaces.create({ account_id: accountId, title })).id
+}
+
+async function assertDomainAvailable(accessToken: string, request: DeployRequest) {
+  const hostname = `${request.appSubdomain}.${request.zoneName}`
+  const [domains, mxRecords, routing] = await Promise.all([
+    cloudflareApi<WorkerDomain[]>(accessToken, `/accounts/${request.accountId}/workers/domains`),
+    cloudflareApi<DnsRecord[]>(accessToken, `/zones/${request.zoneId}/dns_records?type=MX&name=${encodeURIComponent(request.zoneName)}&per_page=100`),
+    cloudflareApi<EmailRoutingSettings>(accessToken, `/zones/${request.zoneId}/email/routing`),
+  ])
+  const attached = domains.find(domain => domain.hostname.toLowerCase() === hostname)
+  if (attached && attached.service !== request.workerName) {
+    throw createError({ statusCode: 409, statusMessage: `${hostname} is already attached to Worker ${attached.service}` })
+  }
+  const foreignMx = mxRecords.filter(record => !String(record.content || '').toLowerCase().endsWith('.mx.cloudflare.net'))
+  if (foreignMx.length) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `${request.zoneName} already has mail exchange records. Discoflare will not replace another mail provider.`,
+    })
+  }
+  if (routing.enabled) {
+    const catchAll = await cloudflareApi<EmailCatchAll>(accessToken, `/zones/${request.zoneId}/email/routing/rules/catch_all`)
+    const target = catchAll.actions?.find(action => action.type === 'worker')?.value?.[0]
+    if (catchAll.enabled && target && target !== request.workerName) {
+      throw createError({ statusCode: 409, statusMessage: `${request.zoneName} already routes catch-all email to Worker ${target}` })
+    }
+    if (catchAll.enabled && !target) {
+      throw createError({ statusCode: 409, statusMessage: `${request.zoneName} already has a catch-all email rule. Discoflare will not replace it.` })
+    }
+  }
+}
+
+async function ensureEmailRouting(accessToken: string, request: DeployRequest) {
+  const routing = await cloudflareApi<EmailRoutingSettings>(accessToken, `/zones/${request.zoneId}/email/routing`)
+  if (routing.enabled && routing.status === 'ready') return
+  await cloudflareApi(accessToken, `/zones/${request.zoneId}/email/routing/dns`, { method: 'POST' })
+}
+
+async function ensureEmailSending(accessToken: string, request: DeployRequest) {
+  const domains = await cloudflareApi<SendingSubdomain[]>(accessToken, `/zones/${request.zoneId}/email/sending/subdomains`)
+  if (domains.some(domain => domain.name.toLowerCase() === request.zoneName && domain.enabled)) return
+  await cloudflareApi(accessToken, `/zones/${request.zoneId}/email/sending/subdomains`, {
+    method: 'POST',
+    body: JSON.stringify({ name: request.zoneName }),
+  })
+}
+
+async function attachAppDomain(accessToken: string, request: DeployRequest) {
+  await cloudflareApi(accessToken, `/accounts/${request.accountId}/workers/domains`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      hostname: `${request.appSubdomain}.${request.zoneName}`,
+      service: request.workerName,
+      zone_id: request.zoneId,
+      zone_name: request.zoneName,
+    }),
+  })
+}
+
+async function attachMailCatchAll(accessToken: string, request: DeployRequest) {
+  await cloudflareApi(accessToken, `/zones/${request.zoneId}/email/routing/rules/catch_all`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      name: 'Discoflare workspace mail',
+      enabled: true,
+      matchers: [{ type: 'all' }],
+      actions: [{ type: 'worker', value: [request.workerName] }],
+    }),
+  })
 }
 
 function sqlString(value: string) {
@@ -190,6 +276,7 @@ async function uploadWorker(
     { type: 'r2_bucket', name: 'FILES', bucket_name: resources.bucketName },
     { type: 'kv_namespace', name: 'TICKETS', namespace_id: resources.kvId },
     { type: 'ai', name: 'AI' },
+    { type: 'send_email', name: 'MAIL_EMAIL' },
     { type: 'assets', name: 'ASSETS' },
     { type: 'workflow', name: manifest.workflow.binding, workflow_name: `${request.workerName}-agent-tasks`, class_name: manifest.workflow.className },
     { type: 'plain_text', name: 'PUBLIC_ORIGIN', text: resources.origin },
@@ -197,6 +284,10 @@ async function uploadWorker(
     { type: 'plain_text', name: 'APP_TITLE', text: 'One workspace for humans, agents, and tasks.' },
     { type: 'plain_text', name: 'APP_SUBTITLE', text: 'Built on your Cloudflare stack.' },
     { type: 'plain_text', name: 'AUTH_REGISTRATION_MODE', text: request.registrationMode },
+    { type: 'plain_text', name: 'MAIL_DOMAIN', text: request.zoneName },
+    { type: 'plain_text', name: 'MAIL_ZONE_ID', text: request.zoneId },
+    { type: 'plain_text', name: 'MAIL_APP_HOSTNAME', text: `${request.appSubdomain}.${request.zoneName}` },
+    { type: 'plain_text', name: 'MAIL_DEFAULT_LOCAL_PART', text: request.mailLocalPart },
     { type: 'plain_text', name: 'AGENT_MODEL', text: '@cf/moonshotai/kimi-k2.7-code' },
     { type: 'plain_text', name: 'DISCOFLARE_INSTALLATION', text: installerMarker },
     { type: 'plain_text', name: 'DISCOFLARE_VERSION', text: manifest.version },
@@ -298,23 +389,25 @@ async function deployContainer(
   })
 }
 
-async function ensureWorkersSubdomain(client: Cloudflare, accountId: string, workerName: string) {
-  try {
-    return (await client.workers.subdomains.get({ account_id: accountId })).subdomain
-  }
-  catch {
-    const subdomain = `${workerName}-${accountId.slice(0, 8)}`
-    return (await client.workers.subdomains.update({ account_id: accountId, subdomain })).subdomain
-  }
-}
-
 export async function deployDiscoflare(
   client: Cloudflare,
   accessToken: string,
   request: DeployRequest,
   release: { manifest: InstallerReleaseManifest, worker: ArrayBuffer, assets: InstallerAssetsPayload },
 ) {
+  await assertDomainAvailable(accessToken, request)
   const existing = await inspectWorker(client, request.accountId, request.workerName)
+  const requestedHostname = `${request.appSubdomain}.${request.zoneName}`
+  if (existing.mailZoneId && (
+    existing.mailZoneId !== request.zoneId
+    || existing.mailDomain !== request.zoneName
+    || existing.appHostname !== requestedHostname
+  )) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `This Discoflare installation already owns ${existing.mailDomain} at ${existing.appHostname}. Domain moves require removing the old Cloudflare routes first.`,
+    })
+  }
   if (!existing.exists) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(request.adminEmail)) {
       throw createError({ statusCode: 400, statusMessage: 'Enter a valid owner email' })
@@ -326,15 +419,14 @@ export async function deployDiscoflare(
       throw createError({ statusCode: 400, statusMessage: 'Enter the owner name' })
     }
   }
-  const [databaseId, bucketName, kvId, subdomain] = await Promise.all([
+  const [databaseId, bucketName, kvId] = await Promise.all([
     ensureD1(client, request.accountId, `${request.workerName}-db`),
     ensureR2(client, request.accountId, `${request.workerName}-files`),
     ensureKv(client, request.accountId, `${request.workerName}-tickets`),
-    ensureWorkersSubdomain(client, request.accountId, request.workerName),
   ])
   await applyD1Migrations(accessToken, request.accountId, databaseId, release.assets)
   const assetsJwt = await uploadAssets(accessToken, request.accountId, request.workerName, release.assets)
-  const origin = `https://${request.workerName}.${subdomain}.workers.dev`
+  const origin = `https://${request.appSubdomain}.${request.zoneName}`
   const uploaded = await uploadWorker(accessToken, request.accountId, request, release.manifest, release.worker, {
     databaseId,
     bucketName,
@@ -347,6 +439,12 @@ export async function deployDiscoflare(
     enabled: true,
     previews_enabled: true,
   })
+  await attachAppDomain(accessToken, request)
+  await Promise.all([
+    ensureEmailRouting(accessToken, request),
+    ensureEmailSending(accessToken, request),
+  ])
+  await attachMailCatchAll(accessToken, request)
   await deployContainer(accessToken, request.accountId, request.workerName, uploaded.deployment_id || uploaded.id, release.manifest)
   return { url: origin, version: release.manifest.version, updated: existing.exists }
 }
