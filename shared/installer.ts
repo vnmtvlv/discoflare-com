@@ -21,8 +21,6 @@ export type DeployRequest = {
   accountId: string
   workerName: string
   adminEmail: string
-  adminPassword: string
-  adminName: string
   appName: string
   registrationMode: 'invite_only' | 'open'
   zoneId: string
@@ -34,6 +32,7 @@ export type DeployRequest = {
 
 export type DeployResponse = {
   url: string
+  setupUrl?: string
   version: string
   updated: boolean
 }

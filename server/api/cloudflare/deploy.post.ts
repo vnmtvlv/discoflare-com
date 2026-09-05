@@ -36,8 +36,6 @@ function parseRequest(value: unknown): DeployRequest {
     appName,
     registrationMode: body.registrationMode,
     adminEmail: String(body.adminEmail || '').trim().toLowerCase().slice(0, 254),
-    adminPassword: String(body.adminPassword || '').slice(0, 256),
-    adminName: String(body.adminName || '').trim().slice(0, 80),
     zoneId,
     zoneName,
     appSubdomain,

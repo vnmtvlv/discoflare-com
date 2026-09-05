@@ -283,6 +283,7 @@ async function uploadWorker(
   worker: ArrayBuffer,
   resources: { databaseId: string, bucketName: string, kvId: string, assetsJwt: string, origin: string },
   existing: ExistingWorker,
+  ownerSetupToken: string | null,
 ) {
   const bindings: Array<Record<string, unknown>> = [
     { type: 'd1', name: 'DB', database_id: resources.databaseId },
@@ -294,6 +295,7 @@ async function uploadWorker(
     { type: 'workflow', name: manifest.workflow.binding, workflow_name: `${request.workerName}-agent-tasks`, class_name: manifest.workflow.className },
     { type: 'plain_text', name: 'PUBLIC_ORIGIN', text: resources.origin },
     { type: 'plain_text', name: 'APP_NAME', text: request.appName },
+    { type: 'plain_text', name: 'ADMIN_WORKSPACE', text: request.appName },
     { type: 'plain_text', name: 'APP_TITLE', text: 'One workspace for humans, agents, and tasks.' },
     { type: 'plain_text', name: 'APP_SUBTITLE', text: 'Built on your Cloudflare stack.' },
     { type: 'plain_text', name: 'AUTH_REGISTRATION_MODE', text: request.registrationMode },
@@ -307,11 +309,11 @@ async function uploadWorker(
     ...manifest.durableObjects.map(item => ({ type: 'durable_object_namespace', name: item.binding, class_name: item.className })),
   ]
   if (!existing.exists) {
+    if (!ownerSetupToken) throw createError({ statusCode: 500, statusMessage: 'Owner setup token was not generated' })
     bindings.push(
       { type: 'secret_text', name: 'AUTH_SECRET', text: randomBase64Url(48) },
       { type: 'secret_text', name: 'ADMIN_EMAIL', text: request.adminEmail },
-      { type: 'secret_text', name: 'ADMIN_PASSWORD', text: request.adminPassword },
-      { type: 'secret_text', name: 'ADMIN_NAME', text: request.adminName },
+      { type: 'secret_text', name: 'ADMIN_SETUP_TOKEN', text: ownerSetupToken },
     )
   }
 
@@ -426,13 +428,8 @@ export async function deployDiscoflare(
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(request.adminEmail)) {
       throw createError({ statusCode: 400, statusMessage: 'Enter a valid owner email' })
     }
-    if (request.adminPassword.length < 12) {
-      throw createError({ statusCode: 400, statusMessage: 'Owner password must be at least 12 characters' })
-    }
-    if (!request.adminName.trim()) {
-      throw createError({ statusCode: 400, statusMessage: 'Enter the owner name' })
-    }
   }
+  const ownerSetupToken = existing.exists ? null : randomBase64Url(32)
   const [databaseId, bucketName, kvId] = await Promise.all([
     ensureD1(client, request.accountId, `${request.workerName}-db`),
     ensureR2(client, request.accountId, `${request.workerName}-files`),
@@ -447,7 +444,7 @@ export async function deployDiscoflare(
     kvId,
     assetsJwt,
     origin,
-  }, existing)
+  }, existing, ownerSetupToken)
   await client.workers.scripts.subdomain.create(request.workerName, {
     account_id: request.accountId,
     enabled: true,
@@ -460,5 +457,10 @@ export async function deployDiscoflare(
   ])
   await attachMailCatchAll(accessToken, request)
   await deployContainer(accessToken, request.accountId, request.workerName, uploaded.deployment_id || uploaded.id, release.manifest)
-  return { url: origin, version: release.manifest.version, updated: existing.exists }
+  return {
+    url: origin,
+    setupUrl: ownerSetupToken ? `${origin}/setup#claim=${encodeURIComponent(ownerSetupToken)}` : undefined,
+    version: release.manifest.version,
+    updated: existing.exists,
+  }
 }

@@ -12,8 +12,6 @@ const form = reactive<DeployRequest>({
   accountId: '',
   workerName: 'discoflare',
   adminEmail: '',
-  adminPassword: '',
-  adminName: 'Owner',
   appName: 'Discoflare',
   registrationMode: 'invite_only',
   zoneId: '',
@@ -59,7 +57,6 @@ async function deploy() {
   result.value = null
   try {
     result.value = await $fetch<DeployResponse>('/api/cloudflare/deploy', { method: 'POST', body: form })
-    form.adminPassword = ''
   }
   catch (cause) {
     const value = cause as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
@@ -194,23 +191,17 @@ useSeoMeta({
             <UCard :ui="{ body: 'space-y-5 p-6 sm:p-8' }">
               <div>
                 <h2 class="text-lg font-semibold text-highlighted">First owner</h2>
-                <p class="mt-1 text-sm text-muted">Used only when the Worker is installed for the first time.</p>
+                <p class="mt-1 text-sm text-muted">After installation, the owner creates their name and password on the workspace domain.</p>
               </div>
-              <UFormField label="Name">
-                <UInput v-model="form.adminName" autocomplete="name" class="w-full" />
-              </UFormField>
-              <UFormField label="Email">
+              <UFormField label="Email" required>
                 <UInput v-model="form.adminEmail" type="email" autocomplete="email" class="w-full" />
-              </UFormField>
-              <UFormField label="Password" hint="12 characters minimum">
-                <UInput v-model="form.adminPassword" type="password" autocomplete="new-password" class="w-full" />
               </UFormField>
             </UCard>
 
             <UAlert v-if="error" color="error" variant="subtle" :title="error" />
             <UAlert v-if="result" color="success" variant="subtle" :title="result.updated ? `Updated to Discoflare ${result.version}` : `Installed Discoflare ${result.version}`">
               <template #actions>
-                <UButton :to="result.url" target="_blank" label="Open workspace" trailing-icon="i-ph-arrow-up-right" color="success" variant="solid" />
+                <UButton :to="result.setupUrl || result.url" target="_blank" :label="result.updated ? 'Open workspace' : 'Create workspace owner'" trailing-icon="i-ph-arrow-up-right" color="success" variant="solid" />
               </template>
             </UAlert>
 
@@ -221,7 +212,7 @@ useSeoMeta({
                 trailing-icon="i-ph-cloud-arrow-up"
                 size="xl"
                 :loading="deploying"
-                :disabled="!form.accountId || !form.zoneId || !form.appSubdomain || !form.mailSubdomain || !form.mailLocalPart"
+                :disabled="!form.accountId || !form.zoneId || !form.appSubdomain || !form.mailSubdomain || !form.mailLocalPart || !form.adminEmail"
               />
               <UButton
                 :to="githubDeployUrl"
