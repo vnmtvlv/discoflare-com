@@ -44,6 +44,8 @@ export default defineNuxtConfig({
       'account-settings.read',
       'memberships.read',
       'zone.read',
+      'zone-settings.read',
+      'zone-settings.write',
       'dns.read',
       'dns.write',
       'email-routing-rules.read',
