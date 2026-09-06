@@ -21,8 +21,11 @@ export type DeployRequest = {
   accountId: string
   workerName: string
   adminEmail: string
+  allowedEmails: string[]
   appName: string
+  authMode: 'access' | 'builtin'
   registrationMode: 'invite_only' | 'open'
+  customDomainEnabled: boolean
   zoneId: string
   zoneName: string
   appSubdomain: string
@@ -56,6 +59,9 @@ export type CloudflareInstallation = {
     mailZoneId: string | null
     mailDomain: string | null
     telemetryId: string | null
+    accessApplicationId: string | null
+    accessHealthApplicationId: string | null
+    accessDeletionApplicationId: string | null
   }
 }
 
@@ -86,6 +92,7 @@ export type InstallerReleaseManifest = {
   releasedAt: string
   compatibilityDate: string
   compatibilityFlags: string[]
+  capabilities?: string[]
   worker: ReleaseAsset
   assets: ReleaseAsset
   container: {

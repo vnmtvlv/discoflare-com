@@ -2,6 +2,7 @@ import type Cloudflare from 'cloudflare'
 import type { DeployRequest, InstallerAssetsPayload, InstallerReleaseManifest } from '../../shared/installer'
 import { cloudflareApi } from './cloudflare-client'
 import { randomBase64Url } from './cloudflare-oauth'
+import { ensureCloudflareAccess, ensureWorkersHostname } from './discoflare-access'
 
 type WorkerUploadResult = {
   deployment_id?: string
@@ -42,6 +43,12 @@ type ExistingWorker = {
   bucketName?: string
   kvId?: string
   telemetryId?: string
+  authMode?: 'access' | 'builtin'
+  accessIssuer?: string
+  accessAudience?: string
+  accessApplicationId?: string
+  accessHealthApplicationId?: string
+  accessDeletionApplicationId?: string
 }
 
 type EmailRoutingSettings = { enabled?: boolean; status?: string }
@@ -99,6 +106,12 @@ async function inspectWorker(client: Cloudflare, accountId: string, workerName: 
       bucketName: bindings.find(binding => binding.name === 'FILES' && binding.type === 'r2_bucket')?.bucket_name,
       kvId: bindings.find(binding => binding.name === 'TICKETS' && binding.type === 'kv_namespace')?.namespace_id,
       telemetryId: text('DISCOFLARE_TELEMETRY_ID'),
+      authMode: text('AUTH_MODE') === 'access' ? 'access' : 'builtin',
+      accessIssuer: text('CF_ACCESS_ISS'),
+      accessAudience: text('CF_ACCESS_AUD'),
+      accessApplicationId: text('CF_ACCESS_APP_ID'),
+      accessHealthApplicationId: text('CF_ACCESS_HEALTH_APP_ID'),
+      accessDeletionApplicationId: text('CF_ACCESS_DELETION_APP_ID'),
     }
   }
   return { exists: false }
@@ -132,11 +145,13 @@ async function ensureKv(client: Cloudflare, accountId: string, title: string) {
 }
 
 async function assertDomainAvailable(accessToken: string, request: DeployRequest) {
-  const hostname = `${request.appSubdomain}.${request.zoneName}`
-  const domains = await cloudflareApi<WorkerDomain[]>(accessToken, `/accounts/${request.accountId}/workers/domains`)
-  const attached = domains.find(domain => domain.hostname.toLowerCase() === hostname)
-  if (attached && attached.service !== request.workerName) {
-    throw createError({ statusCode: 409, statusMessage: `${hostname} is already attached to Worker ${attached.service}` })
+  if (request.customDomainEnabled) {
+    const hostname = `${request.appSubdomain}.${request.zoneName}`
+    const domains = await cloudflareApi<WorkerDomain[]>(accessToken, `/accounts/${request.accountId}/workers/domains`)
+    const attached = domains.find(domain => domain.hostname.toLowerCase() === hostname)
+    if (attached && attached.service !== request.workerName) {
+      throw createError({ statusCode: 409, statusMessage: `${hostname} is already attached to Worker ${attached.service}` })
+    }
   }
   if (!request.mailEnabled) return
 
@@ -327,7 +342,9 @@ async function uploadWorker(
   existing: ExistingWorker,
   ownerSetupToken: string | null,
   telemetry: { installationId: string, token: string },
+  access: { issuer: string, audience: string, applicationId: string, healthApplicationId: string, deletionApplicationId: string } | null,
 ) {
+  const hostname = new URL(resources.origin).hostname
   const bindings: Array<Record<string, unknown>> = [
     { type: 'd1', name: 'DB', database_id: resources.databaseId },
     { type: 'r2_bucket', name: 'FILES', bucket_name: resources.bucketName },
@@ -341,8 +358,9 @@ async function uploadWorker(
     { type: 'plain_text', name: 'APP_TITLE', text: 'One workspace for humans and agents.' },
     { type: 'plain_text', name: 'APP_SUBTITLE', text: 'Built on your Cloudflare stack.' },
     { type: 'plain_text', name: 'AUTH_REGISTRATION_MODE', text: request.registrationMode },
+    { type: 'plain_text', name: 'AUTH_MODE', text: request.authMode },
     { type: 'plain_text', name: 'AGENT_MODEL', text: '@cf/moonshotai/kimi-k2.7-code' },
-    { type: 'plain_text', name: 'DISCOFLARE_APP_HOSTNAME', text: `${request.appSubdomain}.${request.zoneName}` },
+    { type: 'plain_text', name: 'DISCOFLARE_APP_HOSTNAME', text: hostname },
     { type: 'plain_text', name: 'DISCOFLARE_INSTALLATION', text: installerMarker },
     { type: 'plain_text', name: 'DISCOFLARE_VERSION', text: manifest.version },
     { type: 'plain_text', name: 'DISCOFLARE_TELEMETRY_ID', text: telemetry.installationId },
@@ -350,22 +368,30 @@ async function uploadWorker(
     { type: 'secret_text', name: 'DISCOFLARE_TELEMETRY_TOKEN', text: telemetry.token },
     ...manifest.durableObjects.map(item => ({ type: 'durable_object_namespace', name: item.binding, class_name: item.className })),
   ]
+  if (access) {
+    bindings.push(
+      { type: 'plain_text', name: 'CF_ACCESS_ISS', text: access.issuer },
+      { type: 'plain_text', name: 'CF_ACCESS_AUD', text: access.audience },
+      { type: 'plain_text', name: 'CF_ACCESS_APP_ID', text: access.applicationId },
+      { type: 'plain_text', name: 'CF_ACCESS_HEALTH_APP_ID', text: access.healthApplicationId },
+      { type: 'plain_text', name: 'CF_ACCESS_DELETION_APP_ID', text: access.deletionApplicationId },
+    )
+  }
   if (request.mailEnabled) {
     bindings.push(
       { type: 'send_email', name: 'MAIL_EMAIL' },
       { type: 'plain_text', name: 'MAIL_DOMAIN', text: mailDomain(request) },
       { type: 'plain_text', name: 'MAIL_ZONE_ID', text: request.zoneId },
-      { type: 'plain_text', name: 'MAIL_APP_HOSTNAME', text: `${request.appSubdomain}.${request.zoneName}` },
+      { type: 'plain_text', name: 'MAIL_APP_HOSTNAME', text: hostname },
       { type: 'plain_text', name: 'MAIL_DEFAULT_LOCAL_PART', text: request.mailLocalPart },
     )
   }
   if (!existing.exists) {
-    if (!ownerSetupToken) throw createError({ statusCode: 500, statusMessage: 'Owner setup token was not generated' })
     bindings.push(
       { type: 'secret_text', name: 'AUTH_SECRET', text: randomBase64Url(48) },
       { type: 'secret_text', name: 'ADMIN_EMAIL', text: request.adminEmail },
-      { type: 'secret_text', name: 'ADMIN_SETUP_TOKEN', text: ownerSetupToken },
     )
+    if (ownerSetupToken) bindings.push({ type: 'secret_text', name: 'ADMIN_SETUP_TOKEN', text: ownerSetupToken })
   }
 
   const migrations = durableObjectMigrations(manifest, existing)
@@ -486,9 +512,14 @@ export async function deployDiscoflare(
   request: DeployRequest,
   release: { manifest: InstallerReleaseManifest, worker: ArrayBuffer, assets: InstallerAssetsPayload },
 ) {
-  await assertDomainAvailable(accessToken, request)
   const existing = await inspectWorker(client, request.accountId, request.workerName)
-  const requestedHostname = `${request.appSubdomain}.${request.zoneName}`
+  if (existing.exists && existing.authMode !== request.authMode) {
+    throw createError({ statusCode: 409, statusMessage: 'Changing authentication mode on an existing installation requires a manual migration.' })
+  }
+  const requestedHostname = request.customDomainEnabled
+    ? `${request.appSubdomain}.${request.zoneName}`
+    : existing.appHostname || await ensureWorkersHostname(client, request.accountId, request.workerName)
+  await assertDomainAvailable(accessToken, request)
   const requestedMailDomain = mailDomain(request)
   if (existing.appHostname && existing.appHostname !== requestedHostname) {
     throw createError({
@@ -516,7 +547,7 @@ export async function deployDiscoflare(
       throw createError({ statusCode: 400, statusMessage: 'Enter a valid owner email' })
     }
   }
-  const ownerSetupToken = existing.exists ? null : randomBase64Url(32)
+  const ownerSetupToken = existing.exists || request.authMode === 'access' ? null : randomBase64Url(32)
   const telemetry = {
     installationId: existing.telemetryId || crypto.randomUUID(),
     token: randomBase64Url(32),
@@ -533,20 +564,34 @@ export async function deployDiscoflare(
   }
   const appliedMigrations = await applyD1Migrations(accessToken, request.accountId, databaseId, release.assets)
   const assetsJwt = await uploadAssets(accessToken, request.accountId, request.workerName, release.assets)
-  const origin = `https://${request.appSubdomain}.${request.zoneName}`
+  const origin = `https://${requestedHostname}`
+  const access = request.authMode === 'access'
+    ? existing.exists
+      ? {
+          issuer: existing.accessIssuer || '',
+          audience: existing.accessAudience || '',
+          applicationId: existing.accessApplicationId || '',
+          healthApplicationId: existing.accessHealthApplicationId || '',
+          deletionApplicationId: existing.accessDeletionApplicationId || '',
+        }
+      : await ensureCloudflareAccess(client, request, requestedHostname)
+    : null
+  if (access && Object.values(access).some(value => !value)) {
+    throw createError({ statusCode: 409, statusMessage: 'Existing Cloudflare Access bindings are incomplete' })
+  }
   const uploaded = await uploadWorker(accessToken, request.accountId, request, release.manifest, release.worker, {
     databaseId,
     bucketName,
     kvId,
     assetsJwt,
     origin,
-  }, existing, ownerSetupToken, telemetry)
+  }, existing, ownerSetupToken, telemetry, access)
   await client.workers.scripts.subdomain.create(request.workerName, {
     account_id: request.accountId,
-    enabled: true,
-    previews_enabled: true,
+    enabled: !request.customDomainEnabled,
+    previews_enabled: false,
   })
-  await attachAppDomain(accessToken, request)
+  if (request.customDomainEnabled) await attachAppDomain(accessToken, request)
   if (request.mailEnabled) {
     await Promise.all([
       ensureEmailRouting(accessToken, request),

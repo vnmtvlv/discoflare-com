@@ -29,17 +29,21 @@ const form = reactive<DeployRequest>({
   accountId: '',
   workerName: 'discoflare',
   adminEmail: '',
+  allowedEmails: [],
   appName: 'Discoflare',
+  authMode: 'access',
   registrationMode: 'invite_only',
+  customDomainEnabled: false,
   zoneId: '',
   zoneName: '',
   appSubdomain: 'discoflare',
-  mailEnabled: true,
+  mailEnabled: false,
   mailSubdomain: 'discoflare',
   mailLocalPart: 'inbox',
   targetVersion: upgradeTarget || undefined,
 })
 const deploying = ref(false)
+const allowedEmailsText = ref('')
 const result = ref<DeployResponse | null>(null)
 const error = ref(typeof route.query.error === 'string' ? 'Cloudflare connection was not completed.' : '')
 const installation = shallowRef<CloudflareInstallation | null>(null)
@@ -51,7 +55,7 @@ watch(() => session.value.accounts, (accounts) => {
 }, { immediate: true })
 
 const accountZones = computed(() => session.value.zones.filter(zone => zone.accountId === form.accountId && zone.status === 'active'))
-const appHostname = computed(() => form.zoneName ? `${form.appSubdomain}.${form.zoneName}` : '')
+const appHostname = computed(() => form.customDomainEnabled && form.zoneName ? `${form.appSubdomain}.${form.zoneName}` : '')
 const mailDomain = computed(() => form.zoneName ? `${form.mailSubdomain}.${form.zoneName}` : '')
 const mailboxAddress = computed(() => mailDomain.value ? `${form.mailLocalPart}@${mailDomain.value}` : '')
 
@@ -111,7 +115,10 @@ async function deploy() {
   error.value = ''
   result.value = null
   try {
-    result.value = await $fetch<DeployResponse>('/api/cloudflare/deploy', { method: 'POST', body: form })
+    const allowedEmails = form.authMode === 'access'
+      ? allowedEmailsText.value.split(',').map(email => email.trim()).filter(Boolean)
+      : []
+    result.value = await $fetch<DeployResponse>('/api/cloudflare/deploy', { method: 'POST', body: { ...form, allowedEmails } })
   }
   catch (cause) {
     const value = cause as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
@@ -124,14 +131,14 @@ async function deploy() {
 
 const requirements = [
   { icon: 'i-ph-cloud', label: 'A Cloudflare account on the Workers Paid plan', note: 'Agent sandboxes run on Containers, which the free plan does not include.' },
-  { icon: 'i-ph-globe-hemisphere-west', label: 'An active domain in that account', note: 'The workspace gets its own subdomain, such as chat.example.com.' },
-  { icon: 'i-ph-envelope-simple', label: 'An email address for the first owner', note: 'They set their name and password on the workspace domain afterwards.' },
+  { icon: 'i-ph-globe-hemisphere-west', label: 'A workers.dev address is enough', note: 'A custom domain is optional and can be added during installation.' },
+  { icon: 'i-ph-envelope-simple', label: 'An email address for the first owner', note: 'By default Cloudflare Access sends a one-time sign-in code to it.' },
 ]
 
 const installerSteps = [
   { number: '01', title: 'Connect Cloudflare', description: 'Approve a temporary grant for the account that will own the workspace.' },
-  { number: '02', title: 'Choose the details', description: 'Pick the account, domain, subdomains, and whether workspace mail is set up.' },
-  { number: '03', title: 'Install and open', description: 'The installer provisions everything, then hands you a private link to create the owner.' },
+  { number: '02', title: 'Choose the details', description: 'Choose who can sign in, then optionally add a custom domain and workspace mail.' },
+  { number: '03', title: 'Install and open', description: 'The installer provisions everything and opens the workspace through Cloudflare Access.' },
 ]
 
 const provisioned = [
@@ -140,7 +147,8 @@ const provisioned = [
   'An R2 bucket for attachments and raw email',
   'A KV namespace for short-lived connection tickets',
   'Durable Objects, Workflows, Containers, and Workers AI bindings',
-  'A custom hostname on the domain you choose',
+  'A protected workers.dev address or an optional custom hostname',
+  'Cloudflare Access with email one-time codes, by default',
   'Email Routing and a first mailbox, when workspace mail is on',
 ]
 
@@ -325,7 +333,35 @@ useSeoMeta({
                 <UInput v-model="form.appName" autocomplete="organization" class="w-full" />
               </UFormField>
 
-              <UFormField label="Domain" required hint="Must be active in the selected Cloudflare account.">
+              <UFormField label="Sign-in" required>
+                <URadioGroup
+                  v-model="form.authMode"
+                  :items="[
+                    { label: 'Cloudflare Access — email code', value: 'access' },
+                    { label: 'Discoflare accounts — password or OAuth', value: 'builtin' },
+                  ]"
+                />
+              </UFormField>
+
+              <UAlert
+                v-if="form.authMode === 'access'"
+                color="neutral"
+                variant="subtle"
+                title="Cloudflare handles the login"
+                description="The installer creates an Access application and allows the owner email below. Cloudflare sends the one-time code from its own notification service."
+              />
+
+              <UFormField v-if="form.authMode === 'access'" label="Also allow these emails" hint="Optional, comma-separated. You can edit the policy later in Cloudflare Zero Trust.">
+                <UInput v-model="allowedEmailsText" type="text" autocomplete="off" class="w-full" placeholder="friend@example.com, teammate@example.com" />
+              </UFormField>
+
+              <USwitch
+                v-model="form.customDomainEnabled"
+                label="Custom domain"
+                description="Otherwise the workspace uses your account's workers.dev address."
+              />
+
+              <UFormField v-if="form.customDomainEnabled || form.mailEnabled" label="Domain" required hint="Must be active in the selected Cloudflare account.">
                 <USelect
                   v-model="form.zoneId"
                   :items="accountZones.map(zone => ({ label: zone.name, value: zone.id }))"
@@ -335,7 +371,7 @@ useSeoMeta({
                 />
               </UFormField>
 
-              <div class="grid gap-5 sm:grid-cols-2">
+              <div v-if="form.customDomainEnabled" class="grid gap-5 sm:grid-cols-2">
                 <UFormField label="Discoflare subdomain" required>
                   <UInput v-model="form.appSubdomain" autocomplete="off" class="w-full">
                     <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template>
@@ -367,17 +403,17 @@ useSeoMeta({
                 color="warning"
                 variant="subtle"
                 :title="`Email for ${mailDomain} will be handled by Discoflare`"
-                :description="`The installer enables Cloudflare Email Routing, attaches ${appHostname}, and creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`"
+                :description="`The installer enables Cloudflare Email Routing and creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`"
               />
               <UAlert
-                v-else-if="form.zoneName"
+                v-else-if="form.zoneName && form.customDomainEnabled"
                 color="neutral"
                 variant="subtle"
                 title="Email routing stays unchanged"
                 description="No mailbox or email bindings are created. Existing routes, including another workspace's catch-all, remain untouched."
               />
 
-              <UFormField label="Registration" required>
+              <UFormField v-if="form.authMode === 'builtin'" label="Registration" required>
                 <URadioGroup
                   v-model="form.registrationMode"
                   :items="[
@@ -392,7 +428,9 @@ useSeoMeta({
             <UCard v-if="!isUpgrade" :ui="{ body: 'space-y-5 p-6 sm:p-8' }">
               <div>
                 <h2 class="text-lg font-semibold text-highlighted">First owner</h2>
-                <p class="mt-1 text-sm text-muted">After installation, the owner creates their name and password on the workspace domain.</p>
+                <p class="mt-1 text-sm text-muted">
+                  {{ form.authMode === 'access' ? 'This address signs in first and becomes the workspace owner. Cloudflare sends the one-time code.' : 'After installation, the owner creates their name and password on the workspace domain.' }}
+                </p>
               </div>
               <UFormField label="Email" required>
                 <UInput v-model="form.adminEmail" type="email" autocomplete="email" class="w-full" />
@@ -409,7 +447,7 @@ useSeoMeta({
                 <p v-else>No D1 migrations were pending.</p>
               </template>
               <template #actions>
-                <UButton :to="result.setupUrl || result.url" target="_blank" :label="result.updated ? 'Open workspace' : 'Create workspace owner'" trailing-icon="i-ph-arrow-up-right" color="success" variant="solid" />
+                <UButton :to="result.setupUrl || result.url" target="_blank" :label="result.updated || !result.setupUrl ? 'Open workspace' : 'Create workspace owner'" trailing-icon="i-ph-arrow-up-right" color="success" variant="solid" />
               </template>
             </UAlert>
 
@@ -420,7 +458,7 @@ useSeoMeta({
                 trailing-icon="i-ph-cloud-arrow-up"
                 size="xl"
                 :loading="deploying"
-                :disabled="isUpgrade ? !installation : (!form.accountId || !form.zoneId || !form.appSubdomain || (form.mailEnabled && (!form.mailSubdomain || !form.mailLocalPart)) || !form.adminEmail)"
+                :disabled="isUpgrade ? !installation : (!form.accountId || ((form.customDomainEnabled || form.mailEnabled) && !form.zoneId) || (form.customDomainEnabled && !form.appSubdomain) || (form.mailEnabled && (!form.mailSubdomain || !form.mailLocalPart)) || !form.adminEmail)"
               />
               <UButton
                 v-if="!isUpgrade"
