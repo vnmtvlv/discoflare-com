@@ -40,7 +40,7 @@ const form = reactive<DeployRequest>({
   adminEmail: '',
   allowedEmails: [],
   appName: 'Discoflare',
-  authMode: 'access',
+  authMode: 'builtin',
   registrationMode: 'invite_only',
   customDomainEnabled: false,
   zoneId: '',
@@ -339,9 +339,30 @@ useSeoMeta({
                   <UFormField label="Workspace name" required><UInput v-model="form.appName" autocomplete="organization" class="w-full" /></UFormField>
                   <UFormField label="Owner email" required hint="This address becomes the first workspace owner."><UInput v-model="form.adminEmail" type="email" autocomplete="email" class="w-full" /></UFormField>
                   <UFormField label="Sign-in" required>
-                    <URadioGroup v-model="form.authMode" :items="[{ label: 'Cloudflare Access — email code', value: 'access' }, { label: 'Discoflare accounts — password or OAuth', value: 'builtin' }]" />
+                    <URadioGroup
+                      v-model="form.authMode"
+                      :items="[
+                        { label: 'Discoflare accounts', value: 'builtin', description: 'Create the Owner password after deployment and invite members from the workspace.' },
+                        { label: 'Cloudflare Access', value: 'access', description: 'Put Cloudflare Zero Trust in front of the workspace.' },
+                      ]"
+                    />
                   </UFormField>
-                  <UAlert v-if="form.authMode === 'access'" color="neutral" variant="subtle" icon="i-ph-shield-check" title="Cloudflare handles sign-in" description="Cloudflare sends the one-time code. Discoflare does not need an email provider for login." />
+                  <UAlert
+                    v-if="form.authMode === 'builtin'"
+                    color="neutral"
+                    variant="subtle"
+                    icon="i-ph-user-circle"
+                    title="Discoflare handles sign-in"
+                    description="After deployment, a private one-time link creates the Owner password. Private invite links work without workspace email; verification and password reset can be connected later."
+                  />
+                  <UAlert
+                    v-else
+                    color="warning"
+                    variant="subtle"
+                    icon="i-ph-warning"
+                    title="Cloudflare Access is an advanced option"
+                    description="Cloudflare sends email codes, but member access is managed in Zero Trust instead of Discoflare. Adding or removing people requires editing the Access policy, and changing sign-in mode later requires a manual migration."
+                  />
                   <UFormField v-if="form.authMode === 'access'" label="Also allow these emails" hint="Optional, comma-separated."><UInput v-model="allowedEmailsText" autocomplete="off" class="w-full" placeholder="friend@example.com, teammate@example.com" /></UFormField>
                 </form>
 
@@ -355,6 +376,15 @@ useSeoMeta({
                   <div><h2 class="text-lg font-semibold text-highlighted">{{ isUpgrade ? 'Ready to upgrade' : 'Choose optional features' }}</h2><p class="mt-1 text-sm text-muted">{{ isUpgrade ? 'The installer keeps the current hostname, storage, and sign-in mode.' : 'Choose only what this first installation needs.' }}</p></div>
                   <UButton type="button" label="Sign out" color="neutral" variant="ghost" size="sm" @click="disconnect" />
                 </div>
+
+                <UAlert
+                  v-if="!isUpgrade && form.authMode === 'builtin'"
+                  class="mt-6"
+                  color="neutral"
+                  variant="subtle"
+                  title="Workspace email is separate from sign-in"
+                  description="Discoflare accounts and private invite links do not need a mail domain. Enable workspace email only for shared mailboxes and replies; auth verification and password reset can be connected later."
+                />
 
                 <div v-if="isUpgrade && installation" class="mt-6 space-y-3 rounded-xl border border-default bg-elevated p-5 text-sm">
                   <div class="flex justify-between gap-4"><span class="text-muted">Installation</span><span class="text-right text-default">{{ installation.origin }}</span></div>
@@ -384,7 +414,15 @@ useSeoMeta({
                     <UAlert v-if="form.zoneName && form.mailEnabled" color="warning" variant="subtle" :title="`Email for ${mailDomain} will be handled by Discoflare`" :description="`The installer creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`" />
                   </div>
 
-                  <UFormField v-if="form.authMode === 'builtin'" label="Registration" required><URadioGroup v-model="form.registrationMode" :items="[{ label: 'Invite only', value: 'invite_only' }, { label: 'Open signup', value: 'open' }]" /></UFormField>
+                  <UFormField v-if="form.authMode === 'builtin'" label="Registration" required>
+                    <URadioGroup
+                      v-model="form.registrationMode"
+                      :items="[
+                        { label: 'Invite only', value: 'invite_only', description: 'Members create accounts from private invite links.' },
+                        { label: 'Open signup', value: 'open', description: 'Anyone who can reach the workspace can create an account.' },
+                      ]"
+                    />
+                  </UFormField>
                 </form>
 
                 <div class="-mx-6 -mb-6 mt-8 flex items-center justify-between gap-3 border-t border-muted px-6 py-5 sm:-mx-8 sm:-mb-8 sm:px-8">
@@ -431,6 +469,13 @@ useSeoMeta({
                     <p class="mt-1 text-sm leading-6 text-muted">
                       {{ result.updated ? 'Open the workspace and sign in through its existing Access policy.' : `Open the workspace and sign in as ${form.adminEmail}. Cloudflare sends a one-time code, and the owner account is created on first sign-in.` }}
                     </p>
+                  </div>
+                </div>
+                <div v-else-if="result.setupUrl" class="mt-5 flex gap-3 rounded-xl border border-default bg-elevated p-4">
+                  <UIcon name="i-ph-key" class="mt-0.5 size-5 shrink-0 text-primary" />
+                  <div>
+                    <p class="text-sm font-medium text-highlighted">Create the workspace Owner</p>
+                    <p class="mt-1 text-sm leading-6 text-muted">Use the private setup link above to choose the first password. The link becomes unusable after the Owner is created.</p>
                   </div>
                 </div>
 
