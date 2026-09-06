@@ -512,6 +512,7 @@ async function deployContainer(
 async function verifyDeployment(origin: string, version: string, expectReady: boolean, report?: DeployProgressReporter) {
   const attempts = 10
   let lastStatus = 0
+  let lastFailure = ''
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     await report?.({
       type: 'progress',
@@ -527,17 +528,21 @@ async function verifyDeployment(origin: string, version: string, expectReady: bo
         cache: 'no-store',
       })
       lastStatus = response.status
-      if (!response.ok) continue
+      if (!response.ok) {
+        lastFailure = `HTTP ${response.status}`
+        continue
+      }
       const health = await response.json() as DeploymentHealth
       if (health.version === version && health.ok && health.migrated && (!expectReady || health.ready)) return true
+      lastFailure = `health response was not ready for Discoflare ${version}`
     }
-    catch {
-      // Deployment propagation can briefly leave the custom hostname unavailable.
+    catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error)
     }
   }
   throw createError({
     statusCode: 502,
-    statusMessage: `Discoflare ${version} was deployed, but workspace health verification did not complete${lastStatus ? ` (${lastStatus})` : ''}`,
+    statusMessage: `Discoflare ${version} was deployed, but workspace health verification did not complete${lastFailure ? `: ${lastFailure}` : lastStatus ? ` (HTTP ${lastStatus})` : ''}`,
   })
 }
 
