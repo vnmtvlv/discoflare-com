@@ -1,9 +1,10 @@
 <script setup lang="ts">
-defineProps<{
+withDefaults(defineProps<{
   title: string
   description: string
   effectiveDate: string
-}>()
+  eyebrow?: string
+}>(), { eyebrow: 'Legal' })
 </script>
 
 <template>
@@ -22,7 +23,7 @@ defineProps<{
     <main>
       <UContainer class="py-16 sm:py-24">
         <article class="mx-auto max-w-3xl">
-          <p class="text-sm font-medium text-primary">Legal</p>
+          <p class="text-sm font-medium text-primary">{{ eyebrow }}</p>
           <h1 class="display-title mt-3 text-4xl font-semibold text-highlighted sm:text-6xl">{{ title }}</h1>
           <p class="mt-5 max-w-2xl text-lg leading-8 text-muted">{{ description }}</p>
           <p class="mt-4 text-sm text-dimmed">Effective {{ effectiveDate }}</p>
@@ -40,6 +41,7 @@ defineProps<{
       </template>
       <template #right>
         <nav aria-label="Legal" class="flex items-center gap-3 text-sm text-muted">
+          <NuxtLink to="/trust" class="hover:text-highlighted">Trust</NuxtLink>
           <NuxtLink to="/privacy" class="hover:text-highlighted">Privacy</NuxtLink>
           <NuxtLink to="/terms" class="hover:text-highlighted">Terms</NuxtLink>
         </nav>
@@ -71,6 +73,44 @@ defineProps<{
   gap: 0.5rem;
   padding-left: 1.25rem;
   list-style: disc;
+}
+
+.legal-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.legal-content :deep(th) {
+  color: var(--ui-text-dimmed);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.legal-content :deep(th),
+.legal-content :deep(td) {
+  border-bottom: 1px solid var(--ui-border-muted);
+  padding: 0.75rem 0.5rem;
+  vertical-align: top;
+}
+
+.legal-content :deep(td) {
+  color: var(--ui-text-muted);
+  line-height: 1.6;
+}
+
+.legal-content :deep(td:first-child) {
+  color: var(--ui-text-highlighted);
+  font-weight: 500;
+}
+
+.legal-content :deep(code) {
+  color: var(--ui-text-highlighted);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
 }
 
 .legal-content :deep(a) {

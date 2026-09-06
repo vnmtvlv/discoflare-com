@@ -74,6 +74,7 @@ export default defineNuxtConfig({
     '/': { prerender: true },
     '/docs': { prerender: true },
     '/docs/**': { prerender: true },
+    '/trust': { prerender: true },
     '/privacy': { prerender: true },
     '/terms': { prerender: true },
   },

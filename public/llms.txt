@@ -21,6 +21,7 @@ Discoflare is MIT-licensed software with no seat, member, message-retention, mai
 
 ## Policies
 
+- [Trust and security](https://discoflare.com/trust.md): Installer OAuth scopes, deployment telemetry fields, Agent boundaries, compliance posture, and subprocessors.
 - [Privacy policy](https://discoflare.com/privacy.md): How the Discoflare marketing site handles information.
 - [Terms of use](https://discoflare.com/terms.md): Terms governing use of the Discoflare marketing site.
 

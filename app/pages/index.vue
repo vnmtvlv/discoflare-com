@@ -22,11 +22,12 @@ const navigation = computed<NavigationMenuItem[]>(() => [
   { label: 'Agents', to: '#agents' },
   { label: 'Deploy', to: '#deploy' },
   { label: 'Docs', to: '/docs' },
+  { label: 'Trust', to: '/trust' },
   { label: 'Pricing', to: '#pricing' },
   { label: 'FAQ', to: '#faq' },
 ])
 
-const sectionIds = ['features', 'compare', 'agents', 'deploy', 'pricing', 'faq'] as const
+const sectionIds = ['features', 'compare', 'ownership', 'agents', 'models', 'deploy', 'pricing', 'faq'] as const
 let scrollFrame: number | undefined
 
 function syncHashToScroll() {
@@ -74,31 +75,37 @@ const features = [
   {
     icon: 'i-ph-chats-circle',
     title: 'Chat that borrows from both',
+    stack: 'D1 · Durable Objects',
     description: 'Slack-style channels and threads with Discord-style voice huddles. Every message you have ever sent stays searchable—nothing is hidden behind a retention upgrade.',
   },
   {
     icon: 'i-ph-envelope-simple',
     title: 'Mail on your domain',
+    stack: 'Email Routing · Email Sending · R2',
     description: 'Shared mailboxes read as channels and email conversations as threads. Add as many addresses as your team needs without buying a seat for each one.',
   },
   {
     icon: 'i-ph-table',
     title: 'Databases, not another subscription',
+    stack: 'D1',
     description: 'Build workspace databases with typed fields, inline editing, filtering, and sorting. Add records until your Cloudflare plan says stop—not until a plan tier does.',
   },
   {
     icon: 'i-ph-kanban',
     title: 'Tasks that actually run',
+    stack: 'Workflows · Durable Objects',
     description: 'Boards with labels, dependencies, and checklists, where each run is a durable Cloudflare Workflow—resumable, cancellable, and recorded with its result.',
   },
   {
     icon: 'i-ph-robot',
     title: 'AI with no per-seat add-on',
+    stack: 'Workers AI · Containers',
     description: 'Agents are workspace members running on Workers AI through your own binding. No vendor key, no assistant tier—you pay Cloudflare for the inference you use.',
   },
   {
     icon: 'i-ph-cloud',
     title: 'Your account, your data',
+    stack: 'Workers · KV · R2',
     description: 'The Worker, database, files, and live connections run in Cloudflare infrastructure you own. Update in place, read the source, fork it under MIT.',
   },
 ]
@@ -139,6 +146,74 @@ const comparison = [
     elsewhere: 'Closed. You get the roadmap you are given',
     here: 'MIT licensed. Read it, run it, change it',
   },
+]
+
+const platform = [
+  { service: 'Workers', role: 'The workspace itself. One Worker serves the app, the API, and every live connection.' },
+  { service: 'D1', role: 'Messages, mail conversations, records, tasks, members, and permissions.' },
+  { service: 'R2', role: 'Attachments, raw email, and agent workspace checkpoints.' },
+  { service: 'KV', role: 'Short-lived connection tickets.' },
+  { service: 'Durable Objects', role: 'Live connection state and ordered realtime delivery.' },
+  { service: 'Workflows', role: 'Task runs that survive interruption, cancellation, and retry.' },
+  { service: 'Workers AI', role: 'Agent inference through the deployment\u2019s own binding.' },
+  { service: 'Containers', role: 'One isolated sandbox computer per agent.' },
+  { service: 'Email Routing and Sending', role: 'Inbound mail into shared mailboxes, and outbound replies.' },
+]
+
+const youOwn = [
+  'The Cloudflare account and every resource the workspace runs on',
+  'The Worker, the D1 database, the R2 buckets, and the KV namespace',
+  'Every message, mailbox, record, task, and file in the workspace',
+  'The domain and the workspace hostname',
+  'The AI binding, and every token of inference billed to you',
+  'The source, under the MIT license, forkable without permission',
+]
+
+const weOwn = [
+  'The source code and tagged releases published on GitHub',
+  'This website and its guided installer, which holds a Cloudflare OAuth token in your browser session for one hour and never in a database',
+  'An anonymous deployment heartbeat the workspace owner can switch off',
+]
+
+const agentBoundaries = [
+  {
+    number: '01',
+    title: 'No inherited identity',
+    description: 'An Agent never receives a browser session or a human login. A member\u2019s OAuth or social sign-in gives an Agent no repository, shell, credential, or deployment access.',
+  },
+  {
+    number: '02',
+    title: 'Access is granted, never assumed',
+    description: 'An Agent cannot enter a private Channel it has not joined, and every Mail action requires an explicit mailbox grant. Each Channel, Thread, and Task Run keeps its own isolated memory.',
+  },
+  {
+    number: '03',
+    title: 'Risky work stops for a human',
+    description: 'Risky conversational commands pause until an authorized member approves or rejects them. Approving one command is not the same as accepting a whole Task result.',
+  },
+]
+
+const models = [
+  { id: '@cf/zai-org/glm-4.7-flash', input: '$0.06', output: '$0.40', note: 'Cheapest useful default' },
+  { id: '@cf/openai/gpt-oss-20b', input: '$0.20', output: '$0.30', note: 'Balanced everyday agent' },
+  { id: '@cf/meta/llama-4-scout-17b-16e-instruct', input: '$0.27', output: '$0.85', note: 'Reads image attachments' },
+  { id: '@cf/openai/gpt-oss-120b', input: '$0.35', output: '$0.75', note: 'Stronger reasoning' },
+  { id: '@cf/nvidia/nemotron-3-120b-a12b', input: '$0.50', output: '$1.50', note: 'Long, structured work' },
+  { id: '@cf/deepseek-ai/deepseek-v4-pro-0813', input: '$1.32', output: '$3.96', note: 'Hardest tasks' },
+  { id: '@cf/zai-org/glm-5.3', input: '$1.40', output: '$4.40', note: 'Frontier tier' },
+]
+
+const costRows = [
+  { resource: 'Workers requests', included: '10 million per month', after: '$0.30 per additional million' },
+  { resource: 'Worker CPU time', included: '30 million CPU-ms per month', after: '$0.02 per additional million' },
+  { resource: 'D1 rows read', included: '25 billion per month', after: '$0.001 per million' },
+  { resource: 'D1 rows written', included: '50 million per month', after: '$1.00 per million' },
+  { resource: 'D1 storage', included: 'First 5 GB', after: '$0.75 per GB-month' },
+  { resource: 'R2 storage', included: 'First 10 GB-month', after: '$0.015 per GB-month, egress always free' },
+  { resource: 'KV reads', included: '10 million per month', after: '$0.50 per million' },
+  { resource: 'Workflow steps', included: '500,000 per month', after: '$0.80 per additional 100,000' },
+  { resource: 'Agent sandboxes', included: '25 GiB-hours memory and 375 vCPU-minutes per month', after: 'Billed per 10ms only while a sandbox is running' },
+  { resource: 'Agent inference', included: '10,000 neurons per day', after: '$0.011 per 1,000 neurons, or the per-model token rate' },
 ]
 
 const deploySteps = [
@@ -382,7 +457,21 @@ useHead({
               <UIcon :name="feature.icon" class="size-6 text-primary" />
               <h3 class="mt-6 font-semibold text-highlighted">{{ feature.title }}</h3>
               <p class="mt-2 text-sm leading-6 text-muted">{{ feature.description }}</p>
+              <p class="mt-5 font-mono text-xs uppercase tracking-wide text-dimmed">{{ feature.stack }}</p>
             </article>
+          </div>
+
+          <div class="mt-10 overflow-hidden rounded-2xl border border-muted">
+            <div class="border-b border-muted bg-elevated px-6 py-5">
+              <p class="text-xs font-medium uppercase tracking-wide text-dimmed">What runs it</p>
+              <p class="mt-1.5 max-w-2xl text-sm leading-6 text-muted">Nine Cloudflare services, declared by the project and provisioned in the account you choose. There is no origin server, no vendor database, and nothing else in the path.</p>
+            </div>
+            <dl class="grid gap-px bg-muted sm:grid-cols-2 lg:grid-cols-3">
+              <div v-for="item in platform" :key="item.service" class="bg-default px-6 py-5">
+                <dt class="font-mono text-xs uppercase tracking-wide text-primary">{{ item.service }}</dt>
+                <dd class="mt-2 text-sm leading-6 text-muted">{{ item.role }}</dd>
+              </div>
+            </dl>
           </div>
         </UContainer>
       </section>
@@ -423,6 +512,42 @@ useHead({
           <p class="mt-5 max-w-3xl text-xs leading-5 text-dimmed">
             Comparisons describe how these products are packaged and billed, not their quality. Unlimited means Discoflare sets no limit—your Cloudflare plan and storage spend are the ceiling.
           </p>
+        </UContainer>
+      </section>
+
+      <section id="ownership" class="scroll-mt-16 border-b border-muted py-20 sm:py-28">
+        <UContainer>
+          <div class="max-w-3xl">
+            <p class="mb-3 text-sm font-medium text-primary">Ownership</p>
+            <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">Nothing of yours runs on our side.</h2>
+            <p class="mt-5 max-w-2xl text-base leading-7 text-muted sm:text-lg">
+              Plenty of tools promise “your data, your rules” and still keep a control plane in the path. Discoflare keeps none. Once the Worker is deployed, discoflare.com could go offline permanently and your workspace would not notice.
+            </p>
+          </div>
+
+          <div class="mt-12 grid gap-px overflow-hidden rounded-2xl border border-muted bg-muted lg:grid-cols-2">
+            <div class="bg-default p-7 sm:p-9">
+              <p class="text-xs font-medium uppercase tracking-wide text-primary">You own</p>
+              <ul class="mt-6 space-y-3.5 text-sm leading-6 text-toned">
+                <li v-for="item in youOwn" :key="item" class="flex items-start gap-2.5">
+                  <UIcon name="i-ph-check-circle" class="mt-0.5 size-4 shrink-0 text-primary" />
+                  {{ item }}
+                </li>
+              </ul>
+            </div>
+            <div class="bg-default p-7 sm:p-9">
+              <p class="text-xs font-medium uppercase tracking-wide text-dimmed">Discoflare owns</p>
+              <ul class="mt-6 space-y-3.5 text-sm leading-6 text-muted">
+                <li v-for="item in weOwn" :key="item" class="flex items-start gap-2.5">
+                  <UIcon name="i-ph-dot-outline" class="mt-0.5 size-4 shrink-0 text-dimmed" />
+                  {{ item }}
+                </li>
+              </ul>
+              <p class="mt-7 border-t border-muted pt-6 text-sm leading-6 text-dimmed">
+                None of these sit between you and a deployed workspace, and the installer is optional—the repository deploys the same software without it. What the installer asks for, and what the heartbeat contains, is itemised on the <NuxtLink to="/trust" class="text-primary hover:underline">trust page</NuxtLink>.
+              </p>
+            </div>
+          </div>
         </UContainer>
       </section>
 
@@ -499,6 +624,66 @@ useHead({
         </UContainer>
       </section>
 
+      <section id="models" class="scroll-mt-16 border-b border-muted py-20 sm:py-28">
+        <UContainer>
+          <div class="max-w-3xl">
+            <p class="mb-3 text-sm font-medium text-primary">Models</p>
+            <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">Pick the model. Pay Cloudflare for it.</h2>
+            <p class="mt-5 max-w-2xl text-base leading-7 text-muted sm:text-lg">
+              An Agent profile stores a Workers AI model ID, not a vendor key, so the workspace never depends on an outside AI account. Switch per Agent. Below is the range available on the deployment's own binding—from a model that costs cents per million tokens to a frontier one.
+            </p>
+          </div>
+
+          <div class="mt-12 overflow-x-auto rounded-2xl border border-muted">
+            <table class="w-full min-w-xl border-collapse text-left text-sm">
+              <thead>
+                <tr class="border-b border-muted bg-elevated text-xs font-medium uppercase tracking-wide text-dimmed">
+                  <th scope="col" class="px-6 py-4 font-medium">Model</th>
+                  <th scope="col" class="px-6 py-4 font-medium">Input / M tokens</th>
+                  <th scope="col" class="px-6 py-4 font-medium">Output / M tokens</th>
+                  <th scope="col" class="hidden px-6 py-4 font-medium sm:table-cell">Good for</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="model in models" :key="model.id" class="border-b border-muted last:border-b-0">
+                  <td class="px-6 py-4 font-mono text-xs text-highlighted">{{ model.id }}</td>
+                  <td class="px-6 py-4 text-toned">{{ model.input }}</td>
+                  <td class="px-6 py-4 text-toned">{{ model.output }}</td>
+                  <td class="hidden px-6 py-4 text-muted sm:table-cell">{{ model.note }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-5 max-w-3xl text-xs leading-5 text-dimmed">
+            Cloudflare's published Workers AI rates, September 2026. The full catalogue and current prices are on <ULink to="https://developers.cloudflare.com/workers-ai/platform/pricing/" target="_blank" class="text-primary hover:underline">Cloudflare's pricing page</ULink>; your deployment's picker shows every model its binding supports.
+          </p>
+        </UContainer>
+      </section>
+
+      <section class="border-b border-muted py-20 sm:py-28">
+        <UContainer>
+          <div class="max-w-3xl">
+            <p class="mb-3 text-sm font-medium text-primary">Agent boundaries</p>
+            <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">An Agent starts with access to nothing.</h2>
+            <p class="mt-5 max-w-2xl text-base leading-7 text-muted sm:text-lg">
+              Agents are workspace members, and membership is the whole of their authority. Each one also gets a single checkpointed Sandbox computer, restored from your own R2 rather than kept alive as a permanent machine.
+            </p>
+          </div>
+
+          <div class="mt-12 grid gap-px overflow-hidden rounded-2xl border border-muted bg-muted lg:grid-cols-3">
+            <article v-for="boundary in agentBoundaries" :key="boundary.number" class="bg-default p-7 sm:p-8">
+              <span class="font-mono text-sm text-primary">{{ boundary.number }}</span>
+              <h3 class="mt-5 font-semibold text-highlighted">{{ boundary.title }}</h3>
+              <p class="mt-2 text-sm leading-6 text-muted">{{ boundary.description }}</p>
+            </article>
+          </div>
+
+          <p class="mt-6 text-sm leading-6 text-muted">
+            The full boundary, including what an Agent still cannot reach, is in the <NuxtLink to="/docs/product-guide/agents" class="text-primary hover:underline">Agents guide</NuxtLink>.
+          </p>
+        </UContainer>
+      </section>
+
       <section id="deploy" class="scroll-mt-16 border-b border-muted py-20 sm:py-28">
         <UContainer>
           <div class="grid items-start gap-14 lg:grid-cols-[1fr_1.05fr] lg:gap-20">
@@ -561,6 +746,38 @@ useHead({
               <UButton :to="repoUrl" target="_blank" label="View source" icon="i-ph-github-logo" color="neutral" variant="outline" size="lg" />
             </div>
           </UCard>
+
+          <div class="mx-auto mt-16 max-w-4xl">
+            <div class="text-center">
+              <h3 class="display-title text-2xl font-semibold text-highlighted sm:text-3xl">So what does Cloudflare bill?</h3>
+              <p class="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted sm:text-base">
+                One recurring number: the $5 per month Workers Paid minimum, which Agent sandboxes require. Everything else has an included allowance first, and a published rate after it.
+              </p>
+            </div>
+
+            <div class="mt-8 overflow-x-auto rounded-2xl border border-muted">
+              <table class="w-full min-w-xl border-collapse text-left text-sm">
+                <thead>
+                  <tr class="border-b border-muted bg-elevated text-xs font-medium uppercase tracking-wide text-dimmed">
+                    <th scope="col" class="px-6 py-4 font-medium">Resource</th>
+                    <th scope="col" class="px-6 py-4 font-medium">Included</th>
+                    <th scope="col" class="px-6 py-4 font-medium">Rate after that</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in costRows" :key="row.resource" class="border-b border-muted last:border-b-0">
+                    <td class="px-6 py-4 font-medium text-highlighted">{{ row.resource }}</td>
+                    <td class="px-6 py-4 text-toned">{{ row.included }}</td>
+                    <td class="px-6 py-4 text-muted">{{ row.after }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p class="mt-5 text-xs leading-5 text-dimmed">
+              Cloudflare's published rates, September 2026—confirm current pricing on <ULink to="https://developers.cloudflare.com/workers/platform/pricing/" target="_blank" class="text-primary hover:underline">Cloudflare's pricing pages</ULink>. A workspace of a few dozen people usually stays inside most of these allowances; the two lines that actually move with a team are Agent inference and file storage. Voice huddles are billed separately through RealtimeKit.
+            </p>
+          </div>
         </UContainer>
       </section>
 
@@ -597,6 +814,7 @@ useHead({
       </template>
       <nav aria-label="Legal" class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted">
         <NuxtLink to="/docs" class="transition-colors hover:text-highlighted">Docs</NuxtLink>
+        <NuxtLink to="/trust" class="transition-colors hover:text-highlighted">Trust</NuxtLink>
         <NuxtLink to="/privacy" class="transition-colors hover:text-highlighted">Privacy</NuxtLink>
         <NuxtLink to="/terms" class="transition-colors hover:text-highlighted">Terms</NuxtLink>
       </nav>
