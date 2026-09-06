@@ -59,6 +59,7 @@ type WorkerDomain = { hostname: string; service: string }
 type DeploymentHealth = { version?: string; ok?: boolean; ready?: boolean; migrated?: boolean }
 
 export const installerMarker = 'discoflare.com/v1'
+const bootstrapMarker = 'discoflare.com/bootstrap/v1'
 
 function mailDomain(request: DeployRequest) {
   return `${request.mailSubdomain}.${request.zoneName}`
@@ -91,10 +92,12 @@ async function inspectWorker(client: Cloudflare, accountId: string, workerName: 
   for await (const worker of client.workers.scripts.list({ account_id: accountId })) {
     if (worker.id !== workerName) continue
     const settings = await client.workers.scripts.scriptAndVersionSettings.get(workerName, { account_id: accountId })
-    if (!isDiscoflareWorker(settings.bindings as ExistingWorkerBinding[] || [])) {
+    const bindings = settings.bindings as ExistingWorkerBinding[] || []
+    const marker = bindings.find(binding => binding.name === 'DISCOFLARE_INSTALLATION')
+    if (marker?.type === 'plain_text' && marker.text === bootstrapMarker) return { exists: false }
+    if (!isDiscoflareWorker(bindings)) {
       throw createError({ statusCode: 409, statusMessage: `A non-Discoflare Worker named ${workerName} already exists` })
     }
-    const bindings = settings.bindings as ExistingWorkerBinding[] || []
     const text = (name: string) => bindings.find(binding => binding.name === name && binding.type === 'plain_text')?.text
     return {
       exists: true,
@@ -303,6 +306,23 @@ async function uploadAssets(accessToken: string, accountId: string, workerName: 
   }
   if (!completionToken) throw createError({ statusCode: 502, statusMessage: 'Cloudflare did not finish the static asset upload' })
   return completionToken
+}
+
+async function ensureAccessWorkerTarget(accessToken: string, accountId: string, workerName: string, compatibilityDate: string) {
+  const metadata = {
+    main_module: 'discoflare-bootstrap.mjs',
+    compatibility_date: compatibilityDate,
+    bindings: [{ type: 'plain_text', name: 'DISCOFLARE_INSTALLATION', text: bootstrapMarker }],
+  }
+  const source = "export default { fetch() { return new Response('Discoflare is being installed.', { status: 503 }) } }"
+  const form = new FormData()
+  form.append('metadata', JSON.stringify(metadata))
+  form.append('discoflare-bootstrap.mjs', new Blob([source], { type: 'application/javascript+module' }), 'discoflare-bootstrap.mjs')
+  await cloudflareApi(
+    accessToken,
+    `/accounts/${accountId}/workers/scripts/${workerName}?excludeScript=true&bindings_inherit=strict`,
+    { method: 'PUT', body: form },
+  )
 }
 
 function durableObjectMigrations(manifest: InstallerReleaseManifest, worker: ExistingWorker) {
@@ -583,6 +603,9 @@ export async function deployDiscoflare(
   await progress('database', 'complete', appliedMigrations.length ? `${appliedMigrations.length} applied` : 'Up to date')
 
   await progress('assets', 'active')
+  if (request.authMode === 'access' && !request.customDomainEnabled && !existing.exists) {
+    await ensureAccessWorkerTarget(accessToken, request.accountId, request.workerName, release.manifest.compatibilityDate)
+  }
   const assetsJwt = await uploadAssets(accessToken, request.accountId, request.workerName, release.assets)
   await progress('assets', 'complete')
   const origin = `https://${requestedHostname}`
