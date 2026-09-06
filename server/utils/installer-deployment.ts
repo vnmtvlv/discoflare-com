@@ -18,7 +18,10 @@ export function parseDeployRequest(value: unknown): DeployRequest {
   const accountId = String(body.accountId || '').trim()
   const workerName = String(body.workerName || '').trim().toLowerCase()
   const appName = String(body.appName || '').trim()
-  const authMode = body.authMode === 'builtin' ? 'builtin' : 'access'
+  const authMode = body.authMode === undefined ? 'builtin' : body.authMode
+  if (authMode !== 'builtin' && authMode !== 'access') {
+    throw createError({ statusCode: 400, statusMessage: 'Select a sign-in mode' })
+  }
   const customDomainEnabled = body.customDomainEnabled === true
   const zoneId = String(body.zoneId || '').trim()
   const zoneName = String(body.zoneName || '').trim().toLowerCase()
@@ -37,7 +40,8 @@ export function parseDeployRequest(value: unknown): DeployRequest {
   if (customDomainEnabled && !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(appSubdomain)) throw createError({ statusCode: 400, statusMessage: 'App subdomain must use lowercase letters, numbers, and hyphens' })
   if (mailEnabled && !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(mailSubdomain)) throw createError({ statusCode: 400, statusMessage: 'Email subdomain must use lowercase letters, numbers, and hyphens' })
   if (mailEnabled && !/^[a-z0-9](?:[a-z0-9.!#$%&'*+/=?^_`{|}~-]{0,62}[a-z0-9])?$/.test(mailLocalPart)) throw createError({ statusCode: 400, statusMessage: 'Enter a valid default mailbox' })
-  if (authMode === 'builtin' && body.registrationMode !== 'invite_only' && body.registrationMode !== 'open') {
+  const registrationMode = body.registrationMode === undefined ? 'invite_only' : body.registrationMode
+  if (authMode === 'builtin' && registrationMode !== 'invite_only' && registrationMode !== 'open') {
     throw createError({ statusCode: 400, statusMessage: 'Select a registration mode' })
   }
   const adminEmail = String(body.adminEmail || '').trim().toLowerCase().slice(0, 254)
@@ -57,7 +61,7 @@ export function parseDeployRequest(value: unknown): DeployRequest {
     workerName,
     appName,
     authMode,
-    registrationMode: authMode === 'access' ? 'open' : body.registrationMode!,
+    registrationMode: authMode === 'access' ? 'open' : registrationMode,
     adminEmail,
     allowedEmails: allowedEmails.filter(email => email !== adminEmail),
     customDomainEnabled,

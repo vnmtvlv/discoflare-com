@@ -158,7 +158,7 @@ const faqItems: AccordionItem[] = [
   },
   {
     label: 'What do I need to run it?',
-    content: 'A Cloudflare account on the Workers Paid plan and a domain. The guided installer provisions the Worker and its Cloudflare resources without GitHub. The alternative repository-based flow requires a GitHub account and manual resource, binding, secret, hostname, and migration setup.',
+    content: 'A Cloudflare account on the Workers Paid plan. A domain is needed only for a custom workspace address or workspace email. The guided installer provisions the Worker and its Cloudflare resources without GitHub. The alternative repository-based flow requires a GitHub account and manual resource, binding, secret, hostname, and migration setup.',
   },
   {
     label: 'Where is workspace data stored?',
