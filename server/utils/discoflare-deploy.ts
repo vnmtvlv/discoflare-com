@@ -524,7 +524,7 @@ async function verifyDeployment(origin: string, version: string, expectReady: bo
     try {
       const response = await fetch(`${origin}/api/setup/health`, {
         headers: { Accept: 'application/json' },
-        redirect: 'error',
+        redirect: 'manual',
         cache: 'no-store',
       })
       lastStatus = response.status
