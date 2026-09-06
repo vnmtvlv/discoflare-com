@@ -2,7 +2,7 @@
   "name": "discoflare-com",
   "main": ".output/server/index.mjs",
   "compatibility_date": "2026-09-03",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
     "binding": "ASSETS",
     "directory": "./.output/public",
