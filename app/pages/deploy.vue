@@ -114,7 +114,7 @@ const pageTitle = computed(() => {
 const pageDescription = computed(() => {
   if (wizardStep.value === 0) return 'Your own team workspace, in your Cloudflare account'
   if (wizardStep.value === 1) return isUpgrade ? `Find the installation at ${upgradeOrigin}` : 'Choose its address and who signs in first'
-  if (wizardStep.value === 2) return isUpgrade ? 'Existing storage and configuration stay in place' : 'A custom domain and workspace email are both optional'
+  if (wizardStep.value === 2) return isUpgrade ? 'Existing storage and configuration stay in place' : 'Choose a custom workspace address, workspace email, or both'
   if (wizardStep.value === 3) return 'Setting everything up in your Cloudflare account'
   return 'Everything was deployed and verified in your account'
 })
@@ -363,17 +363,26 @@ useSeoMeta({
                 </div>
 
                 <form v-else class="mt-6 space-y-6" @submit.prevent="deploy">
-                  <USwitch v-model="form.customDomainEnabled" label="Custom domain" description="Otherwise the workspace uses your account’s workers.dev address." />
-                  <UFormField v-if="form.customDomainEnabled || form.mailEnabled" label="Cloudflare domain" required hint="Must be active in the selected account."><USelect v-model="form.zoneId" :items="accountZones.map(zone => ({ label: zone.name, value: zone.id }))" value-key="value" class="w-full" placeholder="Select a domain" /></UFormField>
-                  <UFormField v-if="form.customDomainEnabled" label="Discoflare subdomain" required><UInput v-model="form.appSubdomain" autocomplete="off" class="w-full"><template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template></UInput></UFormField>
-
-                  <div class="border-t border-muted pt-6"><USwitch v-model="form.mailEnabled" label="Workspace email" description="Create a mailbox and route this domain’s catch-all email to Discoflare." /></div>
-                  <div v-if="form.mailEnabled" class="grid gap-5 sm:grid-cols-2">
-                    <UFormField label="Email subdomain" required><UInput v-model="form.mailSubdomain" autocomplete="off" class="w-full"><template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template></UInput></UFormField>
-                    <UFormField label="First mailbox" required><UInput v-model="form.mailLocalPart" autocomplete="off" class="w-full"><template #trailing><span v-if="mailDomain" class="text-xs text-muted">@{{ mailDomain }}</span></template></UInput></UFormField>
+                  <div class="space-y-5">
+                    <USwitch v-model="form.customDomainEnabled" label="Custom domain" description="Otherwise the workspace uses your account’s workers.dev address." />
+                    <div class="border-t border-muted pt-5"><USwitch v-model="form.mailEnabled" label="Workspace email" description="Create a mailbox and route this domain’s catch-all email to Discoflare." /></div>
                   </div>
-                  <UAlert v-if="form.zoneName && form.mailEnabled" color="warning" variant="subtle" :title="`Email for ${mailDomain} will be handled by Discoflare`" :description="`The installer creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`" />
-                  <UAlert v-else-if="form.zoneName && form.customDomainEnabled" color="neutral" variant="subtle" title="Email routing stays unchanged" description="No mailbox or email bindings are created." />
+
+                  <div v-if="form.customDomainEnabled || form.mailEnabled" class="space-y-5 rounded-xl border border-default bg-elevated p-5">
+                    <div>
+                      <p class="text-sm font-medium text-highlighted">Domain settings</p>
+                      <p v-if="form.customDomainEnabled && form.mailEnabled" class="mt-1 text-sm text-muted">The same Cloudflare domain is used for the workspace address and workspace email.</p>
+                      <p v-else-if="form.customDomainEnabled" class="mt-1 text-sm text-muted">Email routing stays unchanged.</p>
+                      <p v-else class="mt-1 text-sm text-muted">This domain is used only for workspace email. The workspace keeps its workers.dev address.</p>
+                    </div>
+                    <UFormField label="Cloudflare domain" required hint="Must be active in the selected account."><USelect v-model="form.zoneId" :items="accountZones.map(zone => ({ label: zone.name, value: zone.id }))" value-key="value" class="w-full" placeholder="Select a domain" /></UFormField>
+                    <UFormField v-if="form.customDomainEnabled" label="Discoflare subdomain" required><UInput v-model="form.appSubdomain" autocomplete="off" class="w-full"><template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template></UInput></UFormField>
+                    <div v-if="form.mailEnabled" class="grid gap-5 sm:grid-cols-2">
+                      <UFormField label="Email subdomain" required><UInput v-model="form.mailSubdomain" autocomplete="off" class="w-full"><template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template></UInput></UFormField>
+                      <UFormField label="First mailbox" required><UInput v-model="form.mailLocalPart" autocomplete="off" class="w-full"><template #trailing><span v-if="mailDomain" class="text-xs text-muted">@{{ mailDomain }}</span></template></UInput></UFormField>
+                    </div>
+                    <UAlert v-if="form.zoneName && form.mailEnabled" color="warning" variant="subtle" :title="`Email for ${mailDomain} will be handled by Discoflare`" :description="`The installer creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`" />
+                  </div>
 
                   <UFormField v-if="form.authMode === 'builtin'" label="Registration" required><URadioGroup v-model="form.registrationMode" :items="[{ label: 'Invite only', value: 'invite_only' }, { label: 'Open signup', value: 'open' }]" /></UFormField>
                 </form>

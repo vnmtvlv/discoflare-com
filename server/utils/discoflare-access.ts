@@ -100,7 +100,7 @@ async function putApplication(
   return result as AccessApplication
 }
 
-export async function ensureCloudflareAccess(client: Cloudflare, request: DeployRequest, hostname: string) {
+async function provisionCloudflareAccess(client: Cloudflare, request: DeployRequest, hostname: string) {
   const authDomain = await ensureOrganization(client, request.accountId)
   const [otpProviderId, applications] = await Promise.all([
     ensureOtpProvider(client, request.accountId),
@@ -168,5 +168,20 @@ export async function ensureCloudflareAccess(client: Cloudflare, request: Deploy
     applicationId: application.id,
     healthApplicationId: health.id,
     deletionApplicationId: deletion.id,
+  }
+}
+
+export async function ensureCloudflareAccess(client: Cloudflare, request: DeployRequest, hostname: string) {
+  try {
+    return await provisionCloudflareAccess(client, request, hostname)
+  }
+  catch (error) {
+    if (statusCode(error) === 403) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Cloudflare Access permission was not granted. Sign out, reconnect Cloudflare, and try again.',
+      })
+    }
+    throw error
   }
 }
