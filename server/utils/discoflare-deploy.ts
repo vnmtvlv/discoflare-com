@@ -56,6 +56,7 @@ type EmailCatchAll = { enabled?: boolean; actions?: Array<{ type?: string; value
 type DnsRecord = { name?: string; content?: string; type?: string }
 type SendingSubdomain = { name: string; enabled: boolean }
 type WorkerDomain = { hostname: string; service: string }
+type WorkerSearchResult = { id?: string, script_name?: string }
 type DeploymentHealth = { version?: string; ok?: boolean; ready?: boolean; migrated?: boolean }
 
 export const installerMarker = 'discoflare.com/v1'
@@ -323,6 +324,13 @@ async function ensureAccessWorkerTarget(accessToken: string, accountId: string, 
     `/accounts/${accountId}/workers/scripts/${workerName}?excludeScript=true&bindings_inherit=strict`,
     { method: 'PUT', body: form },
   )
+  const workers = await cloudflareApi<WorkerSearchResult[]>(
+    accessToken,
+    `/accounts/${accountId}/workers/scripts-search?name=${encodeURIComponent(workerName)}`,
+  )
+  const workerId = workers.find(worker => worker.script_name === workerName)?.id
+  if (!workerId) throw createError({ statusCode: 502, statusMessage: 'Cloudflare did not return the Worker ID required by Access' })
+  return workerId
 }
 
 function durableObjectMigrations(manifest: InstallerReleaseManifest, worker: ExistingWorker) {
@@ -603,9 +611,9 @@ export async function deployDiscoflare(
   await progress('database', 'complete', appliedMigrations.length ? `${appliedMigrations.length} applied` : 'Up to date')
 
   await progress('assets', 'active')
-  if (request.authMode === 'access' && !request.customDomainEnabled && !existing.exists) {
-    await ensureAccessWorkerTarget(accessToken, request.accountId, request.workerName, release.manifest.compatibilityDate)
-  }
+  const accessWorkerId = request.authMode === 'access' && !request.customDomainEnabled && !existing.exists
+    ? await ensureAccessWorkerTarget(accessToken, request.accountId, request.workerName, release.manifest.compatibilityDate)
+    : undefined
   const assetsJwt = await uploadAssets(accessToken, request.accountId, request.workerName, release.assets)
   await progress('assets', 'complete')
   const origin = `https://${requestedHostname}`
@@ -619,7 +627,7 @@ export async function deployDiscoflare(
           healthApplicationId: existing.accessHealthApplicationId || '',
           deletionApplicationId: existing.accessDeletionApplicationId || '',
         }
-      : await ensureCloudflareAccess(client, request, requestedHostname)
+      : await ensureCloudflareAccess(client, request, requestedHostname, accessWorkerId)
     : null
   if (access && Object.values(access).some(value => !value)) {
     throw createError({ statusCode: 409, statusMessage: 'Existing Cloudflare Access bindings are incomplete' })
