@@ -44,6 +44,36 @@ export type DeployResponse = {
   verified: boolean
 }
 
+export type DeployProgressStep =
+  | 'account'
+  | 'release'
+  | 'installation'
+  | 'storage'
+  | 'database'
+  | 'assets'
+  | 'access'
+  | 'worker'
+  | 'domain'
+  | 'mail'
+  | 'sandbox'
+  | 'schedule'
+  | 'verify'
+
+export type DeployProgressEvent = {
+  type: 'progress'
+  step: DeployProgressStep
+  state: 'active' | 'complete'
+  detail?: string
+} | {
+  type: 'complete'
+  result: DeployResponse
+} | {
+  type: 'error'
+  message: string
+}
+
+export type DeployProgressReporter = (event: Extract<DeployProgressEvent, { type: 'progress' }>) => void | Promise<void>
+
 export type CloudflareInstallation = {
   accountId: string
   workerName: string

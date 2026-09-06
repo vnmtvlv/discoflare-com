@@ -1,5 +1,5 @@
 import type Cloudflare from 'cloudflare'
-import type { DeployRequest, InstallerAssetsPayload, InstallerReleaseManifest } from '../../shared/installer'
+import type { DeployProgressReporter, DeployProgressStep, DeployRequest, InstallerAssetsPayload, InstallerReleaseManifest } from '../../shared/installer'
 import { cloudflareApi } from './cloudflare-client'
 import { randomBase64Url } from './cloudflare-oauth'
 import { ensureCloudflareAccess, ensureWorkersHostname } from './discoflare-access'
@@ -481,9 +481,15 @@ async function deployContainer(
   })
 }
 
-async function verifyDeployment(origin: string, version: string, expectReady: boolean) {
+async function verifyDeployment(origin: string, version: string, expectReady: boolean, report?: DeployProgressReporter) {
   let lastStatus = 0
   for (let attempt = 0; attempt < 6; attempt += 1) {
+    await report?.({
+      type: 'progress',
+      step: 'verify',
+      state: 'active',
+      detail: `Attempt ${attempt + 1} of 6`,
+    })
     if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 500))
     try {
       const response = await fetch(`${origin}/api/setup/health`, {
@@ -511,7 +517,13 @@ export async function deployDiscoflare(
   accessToken: string,
   request: DeployRequest,
   release: { manifest: InstallerReleaseManifest, worker: ArrayBuffer, assets: InstallerAssetsPayload },
+  report?: DeployProgressReporter,
 ) {
+  const progress = async (step: DeployProgressStep, state: 'active' | 'complete', detail?: string) => {
+    await report?.({ type: 'progress', step, state, detail })
+  }
+
+  await progress('installation', 'active')
   const existing = await inspectWorker(client, request.accountId, request.workerName)
   if (existing.exists && existing.authMode !== request.authMode) {
     throw createError({ statusCode: 409, statusMessage: 'Changing authentication mode on an existing installation requires a manual migration.' })
@@ -542,6 +554,7 @@ export async function deployDiscoflare(
       statusMessage: `This Discoflare installation already owns ${existing.mailDomain} at ${existing.appHostname}. Domain moves require removing the old Cloudflare routes first.`,
     })
   }
+  await progress('installation', 'complete', existing.exists ? 'Existing installation found' : requestedHostname)
   if (!existing.exists) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(request.adminEmail)) {
       throw createError({ statusCode: 400, statusMessage: 'Enter a valid owner email' })
@@ -552,6 +565,7 @@ export async function deployDiscoflare(
     installationId: existing.telemetryId || crypto.randomUUID(),
     token: randomBase64Url(32),
   }
+  await progress('storage', 'active')
   const [databaseId, bucketName, kvId] = existing.exists
     ? [existing.databaseId, existing.bucketName, existing.kvId]
     : await Promise.all([
@@ -562,9 +576,17 @@ export async function deployDiscoflare(
   if (!databaseId || !bucketName || !kvId) {
     throw createError({ statusCode: 409, statusMessage: 'Existing Discoflare storage bindings are incomplete' })
   }
+  await progress('storage', 'complete', existing.exists ? 'Reusing D1, R2, and KV' : 'D1, R2, and KV ready')
+
+  await progress('database', 'active')
   const appliedMigrations = await applyD1Migrations(accessToken, request.accountId, databaseId, release.assets)
+  await progress('database', 'complete', appliedMigrations.length ? `${appliedMigrations.length} applied` : 'Up to date')
+
+  await progress('assets', 'active')
   const assetsJwt = await uploadAssets(accessToken, request.accountId, request.workerName, release.assets)
+  await progress('assets', 'complete')
   const origin = `https://${requestedHostname}`
+  await progress('access', 'active')
   const access = request.authMode === 'access'
     ? existing.exists
       ? {
@@ -579,6 +601,9 @@ export async function deployDiscoflare(
   if (access && Object.values(access).some(value => !value)) {
     throw createError({ statusCode: 409, statusMessage: 'Existing Cloudflare Access bindings are incomplete' })
   }
+  await progress('access', 'complete', request.authMode === 'access' ? 'Email code sign-in ready' : 'Using Discoflare accounts')
+
+  await progress('worker', 'active')
   const uploaded = await uploadWorker(accessToken, request.accountId, request, release.manifest, release.worker, {
     databaseId,
     bucketName,
@@ -586,12 +611,18 @@ export async function deployDiscoflare(
     assetsJwt,
     origin,
   }, existing, ownerSetupToken, telemetry, access)
+  await progress('worker', 'complete', `Discoflare ${release.manifest.version}`)
+
+  await progress('domain', 'active')
   await client.workers.scripts.subdomain.create(request.workerName, {
     account_id: request.accountId,
     enabled: !request.customDomainEnabled,
     previews_enabled: false,
   })
   if (request.customDomainEnabled) await attachAppDomain(accessToken, request)
+  await progress('domain', 'complete', requestedHostname)
+
+  await progress('mail', 'active')
   if (request.mailEnabled) {
     await Promise.all([
       ensureEmailRouting(accessToken, request),
@@ -599,12 +630,22 @@ export async function deployDiscoflare(
     ])
     await attachMailCatchAll(accessToken, request)
   }
+  await progress('mail', 'complete', request.mailEnabled ? mailDomain(request) : 'Skipped')
+
+  await progress('sandbox', 'active')
   await deployContainer(accessToken, request.accountId, request.workerName, uploaded.deployment_id || uploaded.id, release.manifest)
+  await progress('sandbox', 'complete')
+
+  await progress('schedule', 'active')
   await client.workers.scripts.schedules.update(request.workerName, {
     account_id: request.accountId,
     body: [{ cron: '17 4 * * 1' }],
   })
-  await verifyDeployment(origin, release.manifest.version, existing.exists)
+  await progress('schedule', 'complete')
+
+  await progress('verify', 'active')
+  await verifyDeployment(origin, release.manifest.version, existing.exists, report)
+  await progress('verify', 'complete', 'Workspace health verified')
   return {
     url: origin,
     setupUrl: ownerSetupToken ? `${origin}/setup#claim=${encodeURIComponent(ownerSetupToken)}` : undefined,
