@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import type { CloudflareInstallation, DeployRequest, DeployResponse, InstallerSessionResponse } from '../../shared/installer'
+import type {
+  CloudflareInstallation,
+  DeployProgressEvent,
+  DeployProgressStep,
+  DeployRequest,
+  DeployResponse,
+  InstallerSessionResponse,
+} from '../../shared/installer'
+
+type ProgressState = { state: 'waiting' | 'active' | 'complete', detail?: string }
 
 const githubDeployUrl = 'https://deploy.workers.cloudflare.com/?url=https://github.com/vnmtvlv/discoflare'
 const route = useRoute()
@@ -29,29 +38,39 @@ const form = reactive<DeployRequest>({
   accountId: '',
   workerName: 'discoflare',
   adminEmail: '',
+  allowedEmails: [],
   appName: 'Discoflare',
+  authMode: 'access',
   registrationMode: 'invite_only',
+  customDomainEnabled: false,
   zoneId: '',
   zoneName: '',
   appSubdomain: 'discoflare',
-  mailEnabled: true,
+  mailEnabled: false,
   mailSubdomain: 'discoflare',
   mailLocalPart: 'inbox',
   targetVersion: upgradeTarget || undefined,
 })
+const wizardStep = ref<0 | 1 | 2 | 3 | 4>(0)
 const deploying = ref(false)
-const result = ref<DeployResponse | null>(null)
+const allowedEmailsText = ref('')
+const result = shallowRef<DeployResponse | null>(null)
 const error = ref(typeof route.query.error === 'string' ? 'Cloudflare connection was not completed.' : '')
 const installation = shallowRef<CloudflareInstallation | null>(null)
 const installationLoading = ref(false)
 const installationError = ref('')
+const progressState = reactive<Partial<Record<DeployProgressStep, ProgressState>>>({})
 
 watch(() => session.value.accounts, (accounts) => {
   if (!form.accountId && accounts[0]) form.accountId = accounts[0].id
 }, { immediate: true })
 
+watch(() => session.value.connected, (connected) => {
+  if (connected && wizardStep.value === 0) wizardStep.value = 1
+}, { immediate: true })
+
 const accountZones = computed(() => session.value.zones.filter(zone => zone.accountId === form.accountId && zone.status === 'active'))
-const appHostname = computed(() => form.zoneName ? `${form.appSubdomain}.${form.zoneName}` : '')
+const appHostname = computed(() => form.customDomainEnabled && form.zoneName ? `${form.appSubdomain}.${form.zoneName}` : '')
 const mailDomain = computed(() => form.zoneName ? `${form.mailSubdomain}.${form.zoneName}` : '')
 const mailboxAddress = computed(() => mailDomain.value ? `${form.mailLocalPart}@${mailDomain.value}` : '')
 
@@ -67,10 +86,63 @@ watch(() => form.zoneId, (zoneId) => {
   form.zoneName = session.value.zones.find(zone => zone.id === zoneId)?.name || ''
 }, { immediate: true })
 
+const instanceReady = computed(() => {
+  if (isUpgrade) return Boolean(installation.value)
+  return Boolean(
+    form.accountId
+    && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(form.workerName)
+    && form.appName.trim()
+    && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.adminEmail),
+  )
+})
+
+const optionsReady = computed(() => Boolean(
+  (!form.customDomainEnabled && !form.mailEnabled)
+  || (form.zoneId
+    && (!form.customDomainEnabled || form.appSubdomain)
+    && (!form.mailEnabled || (form.mailSubdomain && form.mailLocalPart))),
+))
+
+const pageTitle = computed(() => {
+  if (wizardStep.value === 0) return isUpgrade ? 'Upgrade Discoflare' : 'Deploy Discoflare'
+  if (wizardStep.value === 1) return isUpgrade ? 'Choose the installation' : 'Name your workspace'
+  if (wizardStep.value === 2) return isUpgrade ? 'Review your upgrade' : 'Optional features'
+  if (wizardStep.value === 3) return isUpgrade ? 'Upgrading Discoflare' : 'Deploying Discoflare'
+  return result.value?.updated ? 'Discoflare is updated' : 'Your Discoflare is live'
+})
+
+const pageDescription = computed(() => {
+  if (wizardStep.value === 0) return 'Your own team workspace, in your Cloudflare account'
+  if (wizardStep.value === 1) return isUpgrade ? `Find the installation at ${upgradeOrigin}` : 'Choose its address and who signs in first'
+  if (wizardStep.value === 2) return isUpgrade ? 'Existing storage and configuration stay in place' : 'A custom domain and workspace email are both optional'
+  if (wizardStep.value === 3) return 'Setting everything up in your Cloudflare account'
+  return 'Everything was deployed and verified in your account'
+})
+
+const deploymentItems = computed<Array<{ step: DeployProgressStep, label: string }>>(() => [
+  { step: 'account', label: 'Checking your Cloudflare account' },
+  { step: 'release', label: 'Loading the published Discoflare release' },
+  { step: 'installation', label: isUpgrade ? 'Inspecting the existing installation' : 'Setting up your public URL' },
+  { step: 'storage', label: isUpgrade ? 'Checking D1, R2, and KV storage' : 'Creating D1, R2, and KV storage' },
+  { step: 'database', label: 'Applying database migrations' },
+  { step: 'assets', label: 'Uploading the web application' },
+  { step: 'access', label: form.authMode === 'access' ? 'Setting up Cloudflare Access' : 'Configuring Discoflare accounts' },
+  { step: 'worker', label: 'Deploying the Discoflare Worker' },
+  { step: 'domain', label: form.customDomainEnabled ? `Publishing ${appHostname.value}` : 'Publishing your workers.dev address' },
+  ...(form.mailEnabled ? [{ step: 'mail' as const, label: `Setting up workspace email for ${mailDomain.value}` }] : []),
+  { step: 'sandbox', label: 'Deploying the agent sandbox' },
+  { step: 'schedule', label: 'Scheduling workspace maintenance' },
+  { step: 'verify', label: 'Verifying your deployment' },
+])
+
+const completedProgress = computed(() => deploymentItems.value.filter(item => progressState[item.step]?.state === 'complete').length)
+const progressValue = computed(() => Math.round((completedProgress.value / deploymentItems.value.length) * 100))
+
 async function disconnect() {
   await $fetch('/api/cloudflare/logout', { method: 'POST' })
   result.value = null
   installation.value = null
+  wizardStep.value = 0
   await refresh()
 }
 
@@ -91,6 +163,7 @@ async function loadInstallation() {
     }
     installation.value = response.installations[0]!
     Object.assign(form, installation.value.configuration)
+    allowedEmailsText.value = installation.value.configuration.allowedEmails.join(', ')
   }
   catch (cause) {
     const value = cause as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
@@ -105,44 +178,66 @@ watch(() => session.value.connected, (connected) => {
   if (connected) void loadInstallation()
 }, { immediate: true })
 
+function handleDeployEvent(message: DeployProgressEvent) {
+  if (message.type === 'progress') {
+    progressState[message.step] = { state: message.state, detail: message.detail }
+    return
+  }
+  if (message.type === 'error') throw new Error(message.message)
+  result.value = message.result
+  wizardStep.value = 4
+}
+
 async function deploy() {
-  if (isUpgrade && !installation.value) return
+  if ((isUpgrade && !installation.value) || !optionsReady.value) return
   deploying.value = true
   error.value = ''
   result.value = null
+  wizardStep.value = 3
+  for (const step of deploymentItems.value) progressState[step.step] = { state: 'waiting' }
+
   try {
-    result.value = await $fetch<DeployResponse>('/api/cloudflare/deploy', { method: 'POST', body: form })
+    const allowedEmails = form.authMode === 'access'
+      ? allowedEmailsText.value.split(',').map(email => email.trim()).filter(Boolean)
+      : []
+    const response = await fetch('/api/cloudflare/deploy-stream', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/x-ndjson',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...form, allowedEmails }),
+    })
+    if (!response.ok) {
+      const failure = await response.json().catch(() => ({})) as { statusMessage?: string, message?: string }
+      throw new Error(failure.statusMessage || failure.message || `Deployment failed (${response.status})`)
+    }
+    if (!response.body) throw new Error('Deployment progress stream was unavailable.')
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      buffer += decoder.decode(value, { stream: !done })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (line.trim()) handleDeployEvent(JSON.parse(line) as DeployProgressEvent)
+      }
+      if (done) break
+    }
+    if (buffer.trim()) handleDeployEvent(JSON.parse(buffer) as DeployProgressEvent)
+    if (!result.value) throw new Error('Deployment ended before the workspace was verified.')
   }
   catch (cause) {
-    const value = cause as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
-    error.value = value.data?.statusMessage || value.statusMessage || value.message || 'Deployment failed.'
+    error.value = cause instanceof Error ? cause.message : 'Deployment failed.'
   }
   finally {
     deploying.value = false
   }
 }
-
-const requirements = [
-  { icon: 'i-ph-cloud', label: 'A Cloudflare account on the Workers Paid plan', note: 'Agent sandboxes run on Containers, which the free plan does not include.' },
-  { icon: 'i-ph-globe-hemisphere-west', label: 'An active domain in that account', note: 'The workspace gets its own subdomain, such as chat.example.com.' },
-  { icon: 'i-ph-envelope-simple', label: 'An email address for the first owner', note: 'They set their name and password on the workspace domain afterwards.' },
-]
-
-const installerSteps = [
-  { number: '01', title: 'Connect Cloudflare', description: 'Approve a temporary grant for the account that will own the workspace.' },
-  { number: '02', title: 'Choose the details', description: 'Pick the account, domain, subdomains, and whether workspace mail is set up.' },
-  { number: '03', title: 'Install and open', description: 'The installer provisions everything, then hands you a private link to create the owner.' },
-]
-
-const provisioned = [
-  'One Worker running the whole application',
-  'A D1 database for messages, mail, tasks, and records',
-  'An R2 bucket for attachments and raw email',
-  'A KV namespace for short-lived connection tickets',
-  'Durable Objects, Workflows, Containers, and Workers AI bindings',
-  'A custom hostname on the domain you choose',
-  'Email Routing and a first mailbox, when workspace mail is on',
-]
 
 useSeoMeta({
   title: isUpgrade ? 'Upgrade Discoflare' : 'Deploy Discoflare',
@@ -162,294 +257,190 @@ useSeoMeta({
     </UHeader>
 
     <main>
-      <UContainer class="py-14 sm:py-20">
+      <UContainer class="py-12 sm:py-16">
         <div class="mx-auto max-w-2xl">
-          <p class="text-sm font-medium text-primary">Cloudflare installer</p>
-          <h1 class="display-title mt-3 text-4xl font-semibold text-highlighted sm:text-6xl">
-            {{ isUpgrade ? 'Upgrade Discoflare' : 'Deploy Discoflare' }}
-          </h1>
-          <template v-if="isUpgrade">
-            <p class="mt-4 max-w-xl text-sm text-muted">
-              Connect the Cloudflare account that owns {{ upgradeOrigin }}. The installer will reuse its current storage and apply every pending D1 migration before deploying the release.
-            </p>
-            <p v-if="upgradeTarget" class="mt-2 max-w-xl text-sm text-muted">Target release: Discoflare {{ upgradeTarget.replace(/^v/, '') }}.</p>
-          </template>
-          <template v-else>
-            <p class="mt-4 max-w-xl text-base leading-7 text-muted">
-              One guided pass creates the whole workspace—chat, mail, databases, tasks, and agents—in your own Cloudflare account. The software is free; you pay Cloudflare for what it uses.
-            </p>
+          <div class="text-center">
+            <p class="text-sm font-medium text-primary">Cloudflare installer</p>
+            <h1 class="display-title mt-3 text-4xl font-semibold text-highlighted sm:text-5xl">{{ pageTitle }}</h1>
+            <p class="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted sm:text-base">{{ pageDescription }}</p>
 
-            <ul class="mt-8 space-y-4">
-              <li v-for="requirement in requirements" :key="requirement.label" class="flex gap-3">
-                <UIcon :name="requirement.icon" class="mt-0.5 size-5 shrink-0 text-primary" />
-                <div>
-                  <p class="text-sm font-medium text-highlighted">{{ requirement.label }}</p>
-                  <p class="mt-0.5 text-sm leading-6 text-muted">{{ requirement.note }}</p>
-                </div>
-              </li>
-            </ul>
-          </template>
+            <div class="mx-auto mt-7 grid max-w-56 grid-cols-5 gap-2" aria-label="Deployment progress">
+              <span
+                v-for="step in 5"
+                :key="step"
+                class="h-1 rounded-full transition-colors"
+                :class="step - 1 <= wizardStep ? 'bg-primary' : 'bg-accented'"
+              />
+            </div>
+          </div>
 
           <ClientOnly>
-            <div v-if="status === 'pending'" class="mt-10 flex items-center gap-3 text-muted">
-              <UIcon name="i-ph-spinner-gap" class="size-5 animate-spin" />
-              Checking Cloudflare connection
-            </div>
-
-            <div v-else-if="!session.connected">
-              <div class="mt-10 grid gap-3 sm:grid-cols-2">
-                <UButton
-                  :to="oauthStartUrl"
-                  external
-                  label="Connect Cloudflare"
-                  trailing-icon="i-ph-arrow-right"
-                  size="xl"
-                  block
-                />
-                <UButton
-                  v-if="!isUpgrade"
-                  :to="githubDeployUrl"
-                  target="_blank"
-                  label="Deploy with GitHub"
-                  trailing-icon="i-ph-arrow-up-right"
-                  color="neutral"
-                  variant="outline"
-                  size="xl"
-                  block
-                />
-              </div>
-
-              <div class="mt-5 flex items-start gap-3 rounded-xl border border-default bg-elevated p-4">
-                <UIcon name="i-ph-shield-check" class="mt-0.5 size-5 shrink-0 text-primary" />
-                <div class="text-sm leading-6 text-muted">
-                  <p class="font-medium text-highlighted">The grant is temporary</p>
-                  <p class="mt-1">
-                    The access token stays in this installer session, expires on its own, and is never written into the deployed Worker. Disconnect at any point to drop it immediately.
-                  </p>
-                  <p v-if="!isUpgrade" class="mt-2">
-                    Cloudflare asks for email permission up front. Leaving <span class="text-default">Workspace email</span> off simply means the installer never touches your email routing.
-                  </p>
-                </div>
-              </div>
-
-              <template v-if="!isUpgrade">
-                <section class="mt-14">
-                  <h2 class="text-lg font-semibold text-highlighted">How the install goes</h2>
-                  <ol class="mt-6 space-y-6">
-                    <li v-for="step in installerSteps" :key="step.number" class="flex gap-5">
-                      <span class="font-mono text-sm text-primary">{{ step.number }}</span>
-                      <div>
-                        <h3 class="text-sm font-medium text-highlighted">{{ step.title }}</h3>
-                        <p class="mt-1 text-sm leading-6 text-muted">{{ step.description }}</p>
-                      </div>
-                    </li>
-                  </ol>
-                </section>
-
-                <section class="mt-12 rounded-2xl border border-muted p-6 sm:p-8">
-                  <h2 class="text-lg font-semibold text-highlighted">What it creates in your account</h2>
-                  <p class="mt-2 text-sm leading-6 text-muted">
-                    Everything below is provisioned in the Cloudflare account you select, and stays yours. An existing Discoflare Worker is updated in place, keeping its data.
-                  </p>
-                  <ul class="mt-5 grid gap-2.5 sm:grid-cols-2">
-                    <li v-for="item in provisioned" :key="item" class="flex items-start gap-2 text-sm leading-6 text-toned">
-                      <UIcon name="i-ph-check-circle" class="mt-1 size-4 shrink-0 text-primary" />
-                      {{ item }}
-                    </li>
-                  </ul>
-                </section>
-
-                <section class="mt-12 border-t border-muted pt-8">
-                  <h2 class="text-sm font-medium text-highlighted">Prefer to own a fork?</h2>
-                  <p class="mt-2 text-sm leading-6 text-muted">
-                    The GitHub route builds from source through Workers Builds. It is a manual path: you create the Cloudflare resources and configure every binding, secret, hostname, and migration yourself, then verify the deployed Worker.
-                    <NuxtLink to="/docs/getting-started/deployment-options" class="text-primary hover:underline">Compare both paths</NuxtLink>.
-                  </p>
-                </section>
-              </template>
-            </div>
-
-            <form v-else class="mt-10 space-y-8" @submit.prevent="deploy">
-            <UCard :ui="{ body: 'space-y-5 p-6 sm:p-8' }">
-              <div class="flex items-center justify-between gap-4">
-                <h2 class="text-lg font-semibold text-highlighted">Cloudflare</h2>
-                <UButton type="button" label="Disconnect" color="neutral" variant="ghost" size="sm" @click="disconnect" />
-              </div>
-
-              <div v-if="isUpgrade">
-                <div v-if="installationLoading" class="flex items-center gap-3 py-3 text-sm text-muted">
+            <UCard class="mt-8" :ui="{ body: 'p-6 sm:p-8' }">
+              <template v-if="wizardStep === 0">
+                <div v-if="status === 'pending'" class="flex min-h-56 items-center justify-center gap-3 text-muted">
                   <UIcon name="i-ph-spinner-gap" class="size-5 animate-spin" />
-                  Finding this installation
+                  Checking Cloudflare connection
                 </div>
-                <UAlert v-else-if="installationError" color="error" :title="installationError" />
-                <div v-else-if="installation" class="rounded-lg border border-default bg-elevated p-4">
-                  <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p class="text-sm font-medium text-highlighted">{{ installation.configuration.appName }}</p>
-                      <p class="mt-1 text-sm text-muted">{{ installation.origin }}</p>
-                    </div>
-                    <UBadge
-                      :label="installation.version ? `Discoflare ${installation.version}` : 'Legacy installation'"
-                      color="neutral"
-                      variant="subtle"
-                    />
+
+                <div v-else class="space-y-6">
+                  <div>
+                    <h2 class="text-lg font-semibold text-highlighted">Deploy Discoflare to your Cloudflare account</h2>
+                    <p class="mt-1 text-sm text-muted">Here’s what will happen</p>
                   </div>
-                  <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt class="text-xs text-muted">Worker</dt>
-                      <dd class="mt-0.5 text-default">{{ installation.workerName }}</dd>
+
+                  <div class="space-y-3">
+                    <div class="flex gap-4 rounded-xl border border-default p-4">
+                      <UIcon name="i-ph-lock-key" class="mt-0.5 size-5 shrink-0 text-primary" />
+                      <div><p class="text-sm font-medium text-highlighted">Sign in with Cloudflare</p><p class="mt-1 text-sm text-muted">Approve a temporary grant in the Cloudflare dashboard.</p></div>
                     </div>
-                    <div>
-                      <dt class="text-xs text-muted">Storage</dt>
-                      <dd class="mt-0.5 text-default">Existing D1, R2, and KV</dd>
+                    <div class="flex gap-4 rounded-xl border border-default p-4">
+                      <UIcon name="i-ph-cloud-arrow-up" class="mt-0.5 size-5 shrink-0 text-primary" />
+                      <div><p class="text-sm font-medium text-highlighted">We set up Discoflare for you</p><p class="mt-1 text-sm text-muted">The installer creates the Worker, storage, Access, and public URL in your account.</p></div>
                     </div>
-                  </dl>
+                    <div class="flex gap-4 rounded-xl border border-default p-4">
+                      <UIcon name="i-ph-github-logo" class="mt-0.5 size-5 shrink-0 text-primary" />
+                      <div><p class="text-sm font-medium text-highlighted">Open-source code</p><p class="mt-1 text-sm text-muted">Every guided installation uses the same published Discoflare release.</p></div>
+                    </div>
+                  </div>
+
+                  <UAlert v-if="error" color="error" variant="subtle" :title="error" />
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <UButton :to="oauthStartUrl" external label="Sign in with Cloudflare" trailing-icon="i-ph-arrow-right" size="xl" block />
+                    <UButton v-if="!isUpgrade" :to="githubDeployUrl" target="_blank" label="Deploy with GitHub" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" size="xl" block />
+                  </div>
+                  <p class="text-xs leading-5 text-muted">The token stays only in this one-hour installer session and is never added to your Discoflare Worker.</p>
                 </div>
-              </div>
+              </template>
 
-              <template v-else>
-              <UFormField label="Account" required>
-                <USelect
-                  v-model="form.accountId"
-                  :items="session.accounts.map(account => ({ label: account.name, value: account.id }))"
-                  value-key="value"
-                  class="w-full"
-                />
-              </UFormField>
+              <template v-else-if="wizardStep === 1">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 class="text-lg font-semibold text-highlighted">{{ isUpgrade ? 'Cloudflare installation' : 'Workspace details' }}</h2>
+                    <p class="mt-1 text-sm text-muted">{{ isUpgrade ? 'We will update this Worker in place.' : 'The Worker name becomes part of the default public URL.' }}</p>
+                  </div>
+                  <UButton type="button" label="Sign out" color="neutral" variant="ghost" size="sm" @click="disconnect" />
+                </div>
 
-              <UFormField label="Worker name" required hint="Existing Discoflare Workers are updated in place.">
-                <UInput v-model="form.workerName" autocomplete="off" class="w-full" />
-              </UFormField>
+                <div v-if="isUpgrade" class="mt-6">
+                  <div v-if="installationLoading" class="flex items-center gap-3 py-8 text-sm text-muted"><UIcon name="i-ph-spinner-gap" class="size-5 animate-spin" />Finding this installation</div>
+                  <UAlert v-else-if="installationError" color="error" :title="installationError" />
+                  <div v-else-if="installation" class="rounded-xl border border-default bg-elevated p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div><p class="font-medium text-highlighted">{{ installation.configuration.appName }}</p><p class="mt-1 text-sm text-muted">{{ installation.origin }}</p></div>
+                      <UBadge :label="installation.version ? `Discoflare ${installation.version}` : 'Legacy installation'" color="neutral" variant="subtle" />
+                    </div>
+                    <p class="mt-4 text-sm text-toned">Worker: {{ installation.workerName }}</p>
+                  </div>
+                </div>
 
-              <UFormField label="Workspace name" required>
-                <UInput v-model="form.appName" autocomplete="organization" class="w-full" />
-              </UFormField>
+                <form v-else class="mt-6 space-y-5" @submit.prevent="wizardStep = 2">
+                  <UFormField label="Cloudflare account" required><USelect v-model="form.accountId" :items="session.accounts.map(account => ({ label: account.name, value: account.id }))" value-key="value" class="w-full" /></UFormField>
+                  <UFormField label="Worker name" required hint="Lowercase letters, numbers, and hyphens."><UInput v-model="form.workerName" autocomplete="off" class="w-full" /></UFormField>
+                  <UFormField label="Workspace name" required><UInput v-model="form.appName" autocomplete="organization" class="w-full" /></UFormField>
+                  <UFormField label="Owner email" required hint="This address becomes the first workspace owner."><UInput v-model="form.adminEmail" type="email" autocomplete="email" class="w-full" /></UFormField>
+                  <UFormField label="Sign-in" required>
+                    <URadioGroup v-model="form.authMode" :items="[{ label: 'Cloudflare Access — email code', value: 'access' }, { label: 'Discoflare accounts — password or OAuth', value: 'builtin' }]" />
+                  </UFormField>
+                  <UAlert v-if="form.authMode === 'access'" color="neutral" variant="subtle" icon="i-ph-shield-check" title="Cloudflare handles sign-in" description="Cloudflare sends the one-time code. Discoflare does not need an email provider for login." />
+                  <UFormField v-if="form.authMode === 'access'" label="Also allow these emails" hint="Optional, comma-separated."><UInput v-model="allowedEmailsText" autocomplete="off" class="w-full" placeholder="friend@example.com, teammate@example.com" /></UFormField>
+                </form>
 
-              <UFormField label="Domain" required hint="Must be active in the selected Cloudflare account.">
-                <USelect
-                  v-model="form.zoneId"
-                  :items="accountZones.map(zone => ({ label: zone.name, value: zone.id }))"
-                  value-key="value"
-                  class="w-full"
-                  placeholder="Select a domain"
-                />
-              </UFormField>
+                <div class="-mx-6 -mb-6 mt-8 flex justify-end border-t border-muted px-6 py-5 sm:-mx-8 sm:-mb-8 sm:px-8">
+                  <UButton type="button" label="Continue" trailing-icon="i-ph-arrow-right" size="lg" :disabled="!instanceReady" @click="wizardStep = 2" />
+                </div>
+              </template>
 
-              <div class="grid gap-5 sm:grid-cols-2">
-                <UFormField label="Discoflare subdomain" required>
-                  <UInput v-model="form.appSubdomain" autocomplete="off" class="w-full">
-                    <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template>
-                  </UInput>
-                </UFormField>
-              </div>
+              <template v-else-if="wizardStep === 2">
+                <div class="flex items-center justify-between gap-4">
+                  <div><h2 class="text-lg font-semibold text-highlighted">{{ isUpgrade ? 'Ready to upgrade' : 'Choose optional features' }}</h2><p class="mt-1 text-sm text-muted">{{ isUpgrade ? 'The installer keeps the current hostname, storage, and sign-in mode.' : 'Choose only what this first installation needs.' }}</p></div>
+                  <UButton type="button" label="Sign out" color="neutral" variant="ghost" size="sm" @click="disconnect" />
+                </div>
 
-              <USwitch
-                v-model="form.mailEnabled"
-                label="Workspace email"
-                description="Create a mailbox and assign this domain's catch-all email route to this workspace."
-              />
+                <div v-if="isUpgrade && installation" class="mt-6 space-y-3 rounded-xl border border-default bg-elevated p-5 text-sm">
+                  <div class="flex justify-between gap-4"><span class="text-muted">Installation</span><span class="text-right text-default">{{ installation.origin }}</span></div>
+                  <div class="flex justify-between gap-4"><span class="text-muted">Target</span><span class="text-default">{{ upgradeTarget ? upgradeTarget.replace(/^v/, '') : 'Latest release' }}</span></div>
+                  <div class="flex justify-between gap-4"><span class="text-muted">Data</span><span class="text-default">Existing D1, R2, and KV</span></div>
+                </div>
 
-              <div v-if="form.mailEnabled" class="grid gap-5 sm:grid-cols-2">
-                <UFormField label="Email subdomain" required>
-                  <UInput v-model="form.mailSubdomain" autocomplete="off" class="w-full">
-                    <template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template>
-                  </UInput>
-                </UFormField>
-                <UFormField label="First mailbox" required>
-                  <UInput v-model="form.mailLocalPart" autocomplete="off" class="w-full">
-                    <template #trailing><span v-if="mailDomain" class="text-xs text-muted">@{{ mailDomain }}</span></template>
-                  </UInput>
-                </UFormField>
-              </div>
+                <form v-else class="mt-6 space-y-6" @submit.prevent="deploy">
+                  <USwitch v-model="form.customDomainEnabled" label="Custom domain" description="Otherwise the workspace uses your account’s workers.dev address." />
+                  <UFormField v-if="form.customDomainEnabled || form.mailEnabled" label="Cloudflare domain" required hint="Must be active in the selected account."><USelect v-model="form.zoneId" :items="accountZones.map(zone => ({ label: zone.name, value: zone.id }))" value-key="value" class="w-full" placeholder="Select a domain" /></UFormField>
+                  <UFormField v-if="form.customDomainEnabled" label="Discoflare subdomain" required><UInput v-model="form.appSubdomain" autocomplete="off" class="w-full"><template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template></UInput></UFormField>
 
-              <UAlert
-                v-if="form.zoneName && form.mailEnabled"
-                color="warning"
-                variant="subtle"
-                :title="`Email for ${mailDomain} will be handled by Discoflare`"
-                :description="`The installer enables Cloudflare Email Routing, attaches ${appHostname}, and creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`"
-              />
-              <UAlert
-                v-else-if="form.zoneName"
-                color="neutral"
-                variant="subtle"
-                title="Email routing stays unchanged"
-                description="No mailbox or email bindings are created. Existing routes, including another workspace's catch-all, remain untouched."
-              />
+                  <div class="border-t border-muted pt-6"><USwitch v-model="form.mailEnabled" label="Workspace email" description="Create a mailbox and route this domain’s catch-all email to Discoflare." /></div>
+                  <div v-if="form.mailEnabled" class="grid gap-5 sm:grid-cols-2">
+                    <UFormField label="Email subdomain" required><UInput v-model="form.mailSubdomain" autocomplete="off" class="w-full"><template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template></UInput></UFormField>
+                    <UFormField label="First mailbox" required><UInput v-model="form.mailLocalPart" autocomplete="off" class="w-full"><template #trailing><span v-if="mailDomain" class="text-xs text-muted">@{{ mailDomain }}</span></template></UInput></UFormField>
+                  </div>
+                  <UAlert v-if="form.zoneName && form.mailEnabled" color="warning" variant="subtle" :title="`Email for ${mailDomain} will be handled by Discoflare`" :description="`The installer creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`" />
+                  <UAlert v-else-if="form.zoneName && form.customDomainEnabled" color="neutral" variant="subtle" title="Email routing stays unchanged" description="No mailbox or email bindings are created." />
 
-              <UFormField label="Registration" required>
-                <URadioGroup
-                  v-model="form.registrationMode"
-                  :items="[
-                    { label: 'Invite only', value: 'invite_only' },
-                    { label: 'Open signup', value: 'open' },
-                  ]"
-                />
-              </UFormField>
+                  <UFormField v-if="form.authMode === 'builtin'" label="Registration" required><URadioGroup v-model="form.registrationMode" :items="[{ label: 'Invite only', value: 'invite_only' }, { label: 'Open signup', value: 'open' }]" /></UFormField>
+                </form>
+
+                <div class="-mx-6 -mb-6 mt-8 flex items-center justify-between gap-3 border-t border-muted px-6 py-5 sm:-mx-8 sm:-mb-8 sm:px-8">
+                  <UButton type="button" label="Back" leading-icon="i-ph-arrow-left" color="neutral" variant="ghost" @click="wizardStep = 1" />
+                  <UButton type="button" :label="isUpgrade ? `Upgrade${upgradeTarget ? ` to ${upgradeTarget.replace(/^v/, '')}` : ''}` : 'Deploy Discoflare'" trailing-icon="i-ph-arrow-right" size="lg" :disabled="!optionsReady" @click="deploy" />
+                </div>
+              </template>
+
+              <template v-else-if="wizardStep === 3">
+                <div class="flex items-start justify-between gap-4">
+                  <div><h2 class="text-lg font-semibold text-highlighted">{{ isUpgrade ? 'Upgrading your workspace' : 'Setting up your workspace' }}</h2><p class="mt-1 text-sm text-muted">Keep this tab open until verification finishes.</p></div>
+                  <UButton v-if="!deploying" type="button" label="Sign out" color="neutral" variant="ghost" size="sm" @click="disconnect" />
+                </div>
+                <UProgress class="mt-6" :model-value="progressValue" />
+
+                <ul class="mt-7 space-y-4">
+                  <li v-for="item in deploymentItems" :key="item.step" class="flex items-start gap-3 text-sm">
+                    <UIcon v-if="progressState[item.step]?.state === 'complete'" name="i-ph-check" class="mt-0.5 size-4 shrink-0 text-success" />
+                    <UIcon v-else-if="progressState[item.step]?.state === 'active'" name="i-ph-spinner-gap" class="mt-0.5 size-4 shrink-0 animate-spin text-primary" />
+                    <span v-else class="mt-1.5 size-2 shrink-0 rounded-full bg-accented" />
+                    <div class="min-w-0">
+                      <p :class="progressState[item.step]?.state === 'waiting' ? 'text-muted' : 'text-default'">{{ item.label }}</p>
+                      <p v-if="progressState[item.step]?.detail" class="mt-0.5 text-xs text-muted">{{ progressState[item.step]?.detail }}</p>
+                    </div>
+                  </li>
+                </ul>
+
+                <UAlert v-if="error" class="mt-7" color="error" variant="subtle" title="Deployment stopped" :description="error" />
+                <div v-if="error" class="mt-5 flex gap-3"><UButton label="Try again" icon="i-ph-arrow-clockwise" @click="deploy" /><UButton label="Back" color="neutral" variant="outline" @click="wizardStep = 2" /></div>
+              </template>
+
+              <template v-else-if="result">
+                <div class="py-3 text-center">
+                  <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-success/15"><UIcon name="i-ph-check" class="size-7 text-success" /></div>
+                  <h2 class="mt-5 text-xl font-semibold text-highlighted">{{ result.updated ? `Updated to Discoflare ${result.version}` : `Discoflare ${result.version} is ready` }}</h2>
+                  <p class="mt-2 text-sm text-muted">Workspace health and deployed version were verified.</p>
+                  <UButton class="mt-6" :to="result.setupUrl || result.url" target="_blank" :label="result.url.replace(/^https:\/\//, '')" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" size="lg" />
+                </div>
+
+                <div v-if="form.authMode === 'access'" class="mt-5 flex gap-3 rounded-xl border border-default bg-elevated p-4">
+                  <UIcon name="i-ph-shield-check" class="mt-0.5 size-5 shrink-0 text-success" />
+                  <div>
+                    <p class="text-sm font-medium text-highlighted">Protected by Cloudflare Access</p>
+                    <p class="mt-1 text-sm leading-6 text-muted">
+                      {{ result.updated ? 'Open the workspace and sign in through its existing Access policy.' : `Open the workspace and sign in as ${form.adminEmail}. Cloudflare sends a one-time code, and the owner account is created on first sign-in.` }}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="mt-5 rounded-xl border border-default p-4 text-sm text-muted">
+                  <p v-if="result.appliedMigrations.length">Applied {{ result.appliedMigrations.length }} D1 {{ result.appliedMigrations.length === 1 ? 'migration' : 'migrations' }}: {{ result.appliedMigrations.join(', ') }}.</p>
+                  <p v-else>No D1 migrations were pending.</p>
+                </div>
+
+                <p class="mt-6 text-center text-xs text-muted">Want to customize your deployment? <NuxtLink to="https://github.com/vnmtvlv/discoflare" external target="_blank" class="text-primary hover:underline">Get the source on GitHub</NuxtLink>.</p>
+
+                <div class="-mx-6 -mb-6 mt-8 flex flex-col-reverse gap-3 border-t border-muted px-6 py-5 sm:-mx-8 sm:-mb-8 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+                  <p class="text-xs text-muted">Optional integrations can be configured later in the workspace.</p>
+                  <UButton :to="result.setupUrl || result.url" target="_blank" :label="result.updated || !result.setupUrl ? 'Open your Discoflare' : 'Create workspace owner'" trailing-icon="i-ph-arrow-up-right" size="lg" />
+                </div>
               </template>
             </UCard>
-
-            <UCard v-if="!isUpgrade" :ui="{ body: 'space-y-5 p-6 sm:p-8' }">
-              <div>
-                <h2 class="text-lg font-semibold text-highlighted">First owner</h2>
-                <p class="mt-1 text-sm text-muted">After installation, the owner creates their name and password on the workspace domain.</p>
-              </div>
-              <UFormField label="Email" required>
-                <UInput v-model="form.adminEmail" type="email" autocomplete="email" class="w-full" />
-              </UFormField>
-            </UCard>
-
-            <UAlert v-if="error" color="error" variant="subtle" :title="error" />
-            <UAlert v-if="result" color="success" variant="subtle" :title="result.updated ? `Updated to Discoflare ${result.version}` : `Installed Discoflare ${result.version}`">
-              <template #description>
-                <p>Workspace health and deployed version verified.</p>
-                <p v-if="result.appliedMigrations.length">
-                  Applied {{ result.appliedMigrations.length }} D1 {{ result.appliedMigrations.length === 1 ? 'migration' : 'migrations' }}: {{ result.appliedMigrations.join(', ') }}.
-                </p>
-                <p v-else>No D1 migrations were pending.</p>
-              </template>
-              <template #actions>
-                <UButton :to="result.setupUrl || result.url" target="_blank" :label="result.updated ? 'Open workspace' : 'Create workspace owner'" trailing-icon="i-ph-arrow-up-right" color="success" variant="solid" />
-              </template>
-            </UAlert>
-
-            <div class="flex flex-col gap-3 sm:flex-row">
-              <UButton
-                type="submit"
-                :label="isUpgrade ? `Upgrade${upgradeTarget ? ` to ${upgradeTarget.replace(/^v/, '')}` : ''}` : 'Install or update'"
-                trailing-icon="i-ph-cloud-arrow-up"
-                size="xl"
-                :loading="deploying"
-                :disabled="isUpgrade ? !installation : (!form.accountId || !form.zoneId || !form.appSubdomain || (form.mailEnabled && (!form.mailSubdomain || !form.mailLocalPart)) || !form.adminEmail)"
-              />
-              <UButton
-                v-if="!isUpgrade"
-                :to="githubDeployUrl"
-                target="_blank"
-                label="Deploy with GitHub"
-                trailing-icon="i-ph-arrow-up-right"
-                color="neutral"
-                variant="outline"
-                size="xl"
-              />
-              <UButton
-                v-else
-                :to="upgradeOrigin"
-                external
-                label="Back to workspace"
-                trailing-icon="i-ph-arrow-up-right"
-                color="neutral"
-                variant="outline"
-                size="xl"
-              />
-            </div>
-            </form>
 
             <template #fallback>
-              <div class="mt-10 flex items-center gap-3 text-muted">
-                <UIcon name="i-ph-spinner-gap" class="size-5 animate-spin" />
-                Checking Cloudflare connection
-              </div>
+              <UCard class="mt-8"><div class="flex min-h-56 items-center justify-center gap-3 text-muted"><UIcon name="i-ph-spinner-gap" class="size-5 animate-spin" />Checking Cloudflare connection</div></UCard>
             </template>
           </ClientOnly>
         </div>

@@ -21,8 +21,11 @@ export type DeployRequest = {
   accountId: string
   workerName: string
   adminEmail: string
+  allowedEmails: string[]
   appName: string
+  authMode: 'access' | 'builtin'
   registrationMode: 'invite_only' | 'open'
+  customDomainEnabled: boolean
   zoneId: string
   zoneName: string
   appSubdomain: string
@@ -41,6 +44,36 @@ export type DeployResponse = {
   verified: boolean
 }
 
+export type DeployProgressStep =
+  | 'account'
+  | 'release'
+  | 'installation'
+  | 'storage'
+  | 'database'
+  | 'assets'
+  | 'access'
+  | 'worker'
+  | 'domain'
+  | 'mail'
+  | 'sandbox'
+  | 'schedule'
+  | 'verify'
+
+export type DeployProgressEvent = {
+  type: 'progress'
+  step: DeployProgressStep
+  state: 'active' | 'complete'
+  detail?: string
+} | {
+  type: 'complete'
+  result: DeployResponse
+} | {
+  type: 'error'
+  message: string
+}
+
+export type DeployProgressReporter = (event: Extract<DeployProgressEvent, { type: 'progress' }>) => void | Promise<void>
+
 export type CloudflareInstallation = {
   accountId: string
   workerName: string
@@ -56,6 +89,9 @@ export type CloudflareInstallation = {
     mailZoneId: string | null
     mailDomain: string | null
     telemetryId: string | null
+    accessApplicationId: string | null
+    accessHealthApplicationId: string | null
+    accessDeletionApplicationId: string | null
   }
 }
 
@@ -86,6 +122,7 @@ export type InstallerReleaseManifest = {
   releasedAt: string
   compatibilityDate: string
   compatibilityFlags: string[]
+  capabilities?: string[]
   worker: ReleaseAsset
   assets: ReleaseAsset
   container: {
