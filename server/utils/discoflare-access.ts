@@ -109,7 +109,9 @@ async function provisionCloudflareAccess(client: Cloudflare, request: DeployRequ
   const appName = `Discoflare — ${request.workerName}`
   const healthName = `${appName} health`
   const deletionName = `${appName} deletion`
-  const mainExisting = applications.find(app => app.domain?.toLowerCase() === hostname && app.name === appName)
+  const mainExisting = applications.find(app => app.name === appName && (
+    !request.customDomainEnabled || app.domain?.toLowerCase() === hostname
+  ))
   const healthDomain = `${hostname}/api/setup/health`
   const healthExisting = applications.find(app => app.domain?.toLowerCase() === healthDomain && app.name === healthName)
   const deletionDomain = `${hostname}/api/workspaces/main/deletion/prepare`
@@ -126,7 +128,7 @@ async function provisionCloudflareAccess(client: Cloudflare, request: DeployRequ
 
   const emails = [...new Set([request.adminEmail, ...request.allowedEmails].map(email => email.trim().toLowerCase()))]
   const application = await putApplication(client, request.accountId, mainExisting, {
-    domain: hostname,
+    ...(request.customDomainEnabled ? { domain: hostname } : {}),
     type: 'self_hosted',
     name: appName,
     destinations: request.customDomainEnabled
