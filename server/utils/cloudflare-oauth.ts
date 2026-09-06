@@ -4,6 +4,31 @@ import { installerConfig } from './installer-config'
 export const CLOUDFLARE_AUTH_URL = 'https://dash.cloudflare.com/oauth2/auth'
 export const CLOUDFLARE_TOKEN_URL = 'https://dash.cloudflare.com/oauth2/token'
 export const CLOUDFLARE_REVOKE_URL = 'https://dash.cloudflare.com/oauth2/revoke'
+export const CLOUDFLARE_OAUTH_SCOPES = [
+  'd1.read',
+  'd1.write',
+  'containers.read',
+  'containers.write',
+  'workers-kv-storage.read',
+  'workers-kv-storage.write',
+  'workers-r2.read',
+  'workers-r2.write',
+  'workers-scripts.read',
+  'workers-scripts.write',
+  'account-settings.read',
+  'access:read',
+  'access:write',
+  'memberships.read',
+  'zone.read',
+  'zone-settings.read',
+  'zone-settings.write',
+  'dns.read',
+  'dns.write',
+  'email-routing-rule.read',
+  'email-routing-rule.write',
+  'email-sending.read',
+  'email-sending.write',
+].join(' ')
 
 export function installerOrigin(event: H3Event) {
   const origin = installerConfig(event).installerOrigin
@@ -25,7 +50,7 @@ export function oauthConfig(event: H3Event) {
   return {
     clientId,
     clientSecret,
-    scopes: config.cloudflareOAuthScopes,
+    scopes: CLOUDFLARE_OAUTH_SCOPES,
     redirectUri: `${installerOrigin(event)}/api/cloudflare/oauth/callback`,
   }
 }
