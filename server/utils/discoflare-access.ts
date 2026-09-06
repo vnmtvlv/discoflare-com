@@ -100,7 +100,7 @@ async function putApplication(
   return result as AccessApplication
 }
 
-async function provisionCloudflareAccess(client: Cloudflare, request: DeployRequest, hostname: string) {
+async function provisionCloudflareAccess(client: Cloudflare, request: DeployRequest, hostname: string, workerId?: string) {
   const authDomain = await ensureOrganization(client, request.accountId)
   const [otpProviderId, applications] = await Promise.all([
     ensureOtpProvider(client, request.accountId),
@@ -131,7 +131,7 @@ async function provisionCloudflareAccess(client: Cloudflare, request: DeployRequ
     name: appName,
     destinations: request.customDomainEnabled
       ? [{ type: 'public', uri: hostname }]
-      : [{ type: 'worker', worker_id: request.workerName }],
+      : [{ type: 'worker', worker_id: workerId }],
     allowed_idps: [otpProviderId],
     auto_redirect_to_identity: true,
     app_launcher_visible: true,
@@ -171,9 +171,12 @@ async function provisionCloudflareAccess(client: Cloudflare, request: DeployRequ
   }
 }
 
-export async function ensureCloudflareAccess(client: Cloudflare, request: DeployRequest, hostname: string) {
+export async function ensureCloudflareAccess(client: Cloudflare, request: DeployRequest, hostname: string, workerId?: string) {
+  if (!request.customDomainEnabled && !workerId) {
+    throw createError({ statusCode: 502, statusMessage: 'Cloudflare did not return the Worker ID required by Access' })
+  }
   try {
-    return await provisionCloudflareAccess(client, request, hostname)
+    return await provisionCloudflareAccess(client, request, hostname, workerId)
   }
   catch (error) {
     if (statusCode(error) === 403) {
