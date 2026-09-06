@@ -57,6 +57,8 @@ export default defineNuxtConfig({
       'workers-scripts.read',
       'workers-scripts.write',
       'account-settings.read',
+      'access:read',
+      'access:write',
       'memberships.read',
       'zone.read',
       'zone-settings.read',

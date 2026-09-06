@@ -67,6 +67,18 @@ async function deleteWorkflow(accessToken: string, installation: CloudflareInsta
   deleted.push(`workflow ${installation.resources.workflowName}`)
 }
 
+async function detachAccess(client: Cloudflare, installation: CloudflareInstallation, deleted: string[]) {
+  const ids = [
+    installation.resources.accessApplicationId,
+    installation.resources.accessHealthApplicationId,
+    installation.resources.accessDeletionApplicationId,
+  ].filter((id): id is string => Boolean(id))
+  for (const id of ids) {
+    await unlessMissing(() => client.zeroTrust.access.applications.delete(id, { account_id: installation.accountId }))
+  }
+  if (ids.length) deleted.push(`${ids.length} Cloudflare Access applications`)
+}
+
 export async function prepareLiveFiles(origin: string, claim: string): Promise<number> {
   const response = await fetch(`${origin}/api/workspaces/main/deletion/prepare`, {
     method: 'POST',
@@ -97,6 +109,7 @@ export async function uninstallDiscoflare(
   const remaining: string[] = []
   const deletedObjects = await prepareLiveFiles(installation.origin, claim)
 
+  await detachAccess(client, installation, deleted)
   await detachDomains(client, installation, deleted)
   await detachEmail(client, installation, deleted)
 

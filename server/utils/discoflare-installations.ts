@@ -30,30 +30,35 @@ function installationConfiguration(
   bindings: ExistingWorkerBinding[],
   zones: CloudflareZone[],
 ): DeployRequest | null {
-  const zone = zones
+  const appZone = zones
     .filter(item => item.accountId === accountId && item.status === 'active' && (hostname === item.name || hostname.endsWith(`.${item.name}`)))
     .sort((left, right) => right.name.length - left.name.length)[0]
-  if (!zone) return null
-
-  const appSubdomain = subdomain(hostname, zone.name)
-  if (!appSubdomain) return null
+  const customDomainEnabled = Boolean(appZone)
+  if (!customDomainEnabled && !hostname.endsWith('.workers.dev')) return null
+  const appSubdomain = appZone ? subdomain(hostname, appZone.name) : workerName
+  if (appZone && !appSubdomain) return null
   const mailDomain = textBinding(bindings, 'MAIL_DOMAIN')
   const mailZoneId = textBinding(bindings, 'MAIL_ZONE_ID')
-  const mailSubdomain = subdomain(mailDomain, zone.name)
+  const selectedZone = zones.find(item => item.accountId === accountId && item.id === mailZoneId) || appZone
+  const mailSubdomain = selectedZone ? subdomain(mailDomain, selectedZone.name) : ''
   const mailEnabled = Boolean(mailDomain && mailZoneId && mailSubdomain)
   const registration = textBinding(bindings, 'AUTH_REGISTRATION_MODE')
+  const mode = textBinding(bindings, 'AUTH_MODE') === 'access' ? 'access' : 'builtin'
 
   return {
     accountId,
     workerName,
     adminEmail: '',
+    allowedEmails: [],
     appName: textBinding(bindings, 'APP_NAME') || textBinding(bindings, 'ADMIN_WORKSPACE') || 'Discoflare',
+    authMode: mode,
     registrationMode: registration === 'open' ? 'open' : 'invite_only',
-    zoneId: mailEnabled ? mailZoneId : zone.id,
-    zoneName: zone.name,
+    customDomainEnabled,
+    zoneId: selectedZone?.id || '',
+    zoneName: selectedZone?.name || '',
     appSubdomain,
     mailEnabled,
-    mailSubdomain: mailEnabled ? mailSubdomain : appSubdomain,
+    mailSubdomain: mailEnabled ? mailSubdomain : customDomainEnabled ? appSubdomain : 'discoflare',
     mailLocalPart: textBinding(bindings, 'MAIL_DEFAULT_LOCAL_PART') || 'inbox',
   }
 }
@@ -68,9 +73,11 @@ export async function findDiscoflareInstallations(accessToken: string, origin: u
     if (!zone.id || !zone.name || !zone.account?.id) continue
     zones.push({ id: zone.id, name: zone.name, accountId: zone.account.id, status: zone.status || 'unknown' })
   }
-  const candidateAccountIds = new Set(zones
-    .filter(zone => zone.status === 'active' && (hostname === zone.name || hostname.endsWith(`.${zone.name}`)))
-    .map(zone => zone.accountId))
+  const candidateAccountIds = hostname.endsWith('.workers.dev')
+    ? new Set(accounts.map(account => account.id))
+    : new Set(zones
+        .filter(zone => zone.status === 'active' && (hostname === zone.name || hostname.endsWith(`.${zone.name}`)))
+        .map(zone => zone.accountId))
 
   const installations: CloudflareInstallation[] = []
   for (const account of accounts) {
@@ -99,6 +106,9 @@ export async function findDiscoflareInstallations(accessToken: string, origin: u
           mailZoneId: textBinding(bindings, 'MAIL_ZONE_ID') || null,
           mailDomain: textBinding(bindings, 'MAIL_DOMAIN') || null,
           telemetryId: textBinding(bindings, 'DISCOFLARE_TELEMETRY_ID') || null,
+          accessApplicationId: textBinding(bindings, 'CF_ACCESS_APP_ID') || null,
+          accessHealthApplicationId: textBinding(bindings, 'CF_ACCESS_HEALTH_APP_ID') || null,
+          accessDeletionApplicationId: textBinding(bindings, 'CF_ACCESS_DELETION_APP_ID') || null,
         },
       })
     }
