@@ -510,15 +510,16 @@ async function deployContainer(
 }
 
 async function verifyDeployment(origin: string, version: string, expectReady: boolean, report?: DeployProgressReporter) {
+  const attempts = 10
   let lastStatus = 0
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     await report?.({
       type: 'progress',
       step: 'verify',
       state: 'active',
-      detail: `Attempt ${attempt + 1} of 6`,
+      detail: `Attempt ${attempt + 1} of ${attempts}`,
     })
-    if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 500))
+    if (attempt) await new Promise(resolve => setTimeout(resolve, 3_000))
     try {
       const response = await fetch(`${origin}/api/setup/health`, {
         headers: { Accept: 'application/json' },
@@ -675,7 +676,7 @@ export async function deployDiscoflare(
   await progress('schedule', 'complete')
 
   await progress('verify', 'active')
-  await verifyDeployment(origin, release.manifest.version, existing.exists, report)
+  await verifyDeployment(origin, release.manifest.version, existing.exists && request.authMode !== 'access', report)
   await progress('verify', 'complete', 'Workspace health verified')
   return {
     url: origin,
