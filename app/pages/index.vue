@@ -610,17 +610,6 @@ useHead({
             <TaskDemo />
           </DemoPanel>
 
-          <div class="border-t border-muted" />
-
-          <DemoPanel
-            eyebrow="Voice huddles"
-            title="Move from typing to talking."
-            description="Start a voice huddle from a channel when text is not enough. RealtimeKit carries the media while Discoflare keeps the workspace context."
-            icon="i-ph-waveform"
-            reverse
-          >
-            <HuddleDemo />
-          </DemoPanel>
         </UContainer>
       </section>
 

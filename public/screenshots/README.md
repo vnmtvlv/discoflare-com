@@ -17,10 +17,11 @@ released workspace surface, in this order:
 2. Save as an optimized JPG under this directory using the exact filename above.
 3. In `ProductPreview.vue`, delete the `pending: true` line from that surface.
 
-All five tabs are always visible. A surface marked `pending` — or one whose
-file fails to load at runtime — keeps its button and shows `chat.jpg` as a
-placeholder, borrowing its alt text too, so the hero never renders a broken
-image and never describes a screenshot the visitor is not looking at.
+Only surfaces with a real screenshot appear. A surface marked `pending` — or
+one whose file fails to load at runtime — is left out of the gallery entirely,
+so a visitor never clicks Mail and is shown Chat. While one screenshot exists
+the tab strip is hidden and the hero shows that image alone; the strip returns
+as soon as a second surface has a file.
 
 Use the dark theme, a realistic but fictional workspace, and no real customer
 data, real email addresses, or personal names.
