@@ -151,12 +151,12 @@ const comparison = [
 const platform = [
   { service: 'Workers', role: 'The workspace itself. One Worker serves the app, the API, and every live connection.' },
   { service: 'D1', role: 'Messages, mail conversations, records, tasks, members, and permissions.' },
-  { service: 'R2', role: 'Attachments, raw email, and agent workspace checkpoints.' },
+  { service: 'R2', role: 'Attachments, raw email, and large Agent artifacts.' },
   { service: 'KV', role: 'Short-lived connection tickets.' },
   { service: 'Durable Objects', role: 'Live connection state and ordered realtime delivery.' },
   { service: 'Workflows', role: 'Task runs that survive interruption, cancellation, and retry.' },
   { service: 'Workers AI', role: 'Agent inference through the deployment\u2019s own binding.' },
-  { service: 'Containers', role: 'One isolated sandbox computer per agent.' },
+  { service: 'Containers', role: 'Linux execution for each durable Agent Computer.' },
   { service: 'Email Routing and Sending', role: 'Inbound mail into shared mailboxes, and outbound replies.' },
 ]
 
@@ -212,7 +212,7 @@ const costRows = [
   { resource: 'R2 storage', included: 'First 10 GB-month', after: '$0.015 per GB-month, egress always free' },
   { resource: 'KV reads', included: '10 million per month', after: '$0.50 per million' },
   { resource: 'Workflow steps', included: '500,000 per month', after: '$0.80 per additional 100,000' },
-  { resource: 'Agent sandboxes', included: '25 GiB-hours memory and 375 vCPU-minutes per month', after: 'Billed per 10ms only while a sandbox is running' },
+  { resource: 'Agent Computers', included: '25 GiB-hours memory and 375 vCPU-minutes per month', after: 'Container execution is billed per 10ms while running' },
   { resource: 'Agent inference', included: '10,000 neurons per day', after: '$0.011 per 1,000 neurons, or the per-model token rate' },
 ]
 
@@ -237,7 +237,7 @@ const faqItems: AccordionItem[] = [
   },
   {
     label: 'Where is workspace data stored?',
-    content: 'Messages, mail, databases, tasks, and members use D1. Attachments, raw email, and agent checkpoints use R2. Short-lived connection tickets use KV. All of it lives in the Cloudflare account used for deployment, not in an account we control.',
+    content: 'Messages, mail, databases, tasks, and members use D1. Agent Computer files live in Durable Object SQLite; attachments, raw email, and large artifacts use R2. Short-lived connection tickets use KV. All of it lives in the Cloudflare account used for deployment, not in an account we control.',
   },
   {
     label: 'How does mail work without a mail vendor?',
@@ -245,7 +245,7 @@ const faqItems: AccordionItem[] = [
   },
   {
     label: 'What runs the agents?',
-    content: 'Agents use Workers AI through the deployment\u2019s own AI binding. An agent profile stores a model id rather than a vendor key, so the workspace does not depend on an external AI provider account. Agent sandboxes use Cloudflare Containers, which is why the Workers Paid plan is required.',
+    content: 'Agents use Workers AI through the deployment\u2019s own AI binding. Each Agent has a durable Computer backed by Durable Object SQLite and uses Cloudflare Containers for Linux execution, which is why the Workers Paid plan is required.',
   },
   {
     label: 'How are agent actions controlled?',
@@ -655,7 +655,7 @@ useHead({
             <p class="mb-3 text-sm font-medium text-primary">Agent boundaries</p>
             <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">An Agent starts with access to nothing.</h2>
             <p class="mt-5 max-w-2xl text-base leading-7 text-muted sm:text-lg">
-              Agents are workspace members, and membership is the whole of their authority. Each one also gets a single checkpointed Sandbox computer, restored from your own R2 rather than kept alive as a permanent machine.
+              Agents are workspace members, and membership is the whole of their authority. Each one also gets a durable Computer: files live in its Durable Object, while Linux commands run through an isolated Container backend.
             </p>
           </div>
 
@@ -740,7 +740,7 @@ useHead({
             <div class="text-center">
               <h3 class="display-title text-2xl font-semibold text-highlighted sm:text-3xl">So what does Cloudflare bill?</h3>
               <p class="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted sm:text-base">
-                One recurring number: the $5 per month Workers Paid minimum, which Agent sandboxes require. Everything else has an included allowance first, and a published rate after it.
+                One recurring number: the $5 per month Workers Paid minimum, which Agent Computers require for Container execution. Everything else has an included allowance first, and a published rate after it.
               </p>
             </div>
 

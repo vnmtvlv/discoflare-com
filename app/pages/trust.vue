@@ -8,7 +8,7 @@ const scopeGroups = [
   {
     purpose: 'Deploy the workspace',
     scopes: ['workers-scripts.read', 'workers-scripts.write', 'containers.read', 'containers.write'],
-    reason: 'Create and update the Worker that is your workspace, and the container image its Agent sandboxes run in.',
+    reason: 'Create and update the Worker that is your workspace, and the Container backend its Agent Computers run through.',
   },
   {
     purpose: 'Create its storage',
@@ -155,7 +155,7 @@ useHead({
     <section>
       <h2>Agent boundaries</h2>
       <p>Agents are workspace members, not sign-in identities. An Agent never receives a browser session or a human login, so a member's OAuth or social sign-in grants it no repository, shell, credential, or deployment access. It cannot enter a private Channel it has not joined, every Mail action requires an explicit mailbox grant, and risky conversational commands pause until an authorized member approves them.</p>
-      <p>Each Agent runs its tools in one isolated Cloudflare Containers sandbox, checkpointed to your own R2 rather than kept alive as a permanent machine. The complete boundary is documented in the <NuxtLink to="/docs/product-guide/agents">Agents guide</NuxtLink>.</p>
+      <p>Each Agent owns a durable Computer whose filesystem lives in Durable Object SQLite. Linux commands run through an isolated Cloudflare Container backend; large artifacts belong in your R2 bucket. The complete boundary is documented in the <NuxtLink to="/docs/product-guide/agents">Agents guide</NuxtLink>.</p>
     </section>
 
     <section>

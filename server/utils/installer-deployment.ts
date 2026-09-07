@@ -1,78 +1,18 @@
 import type { H3Event } from 'h3'
+import {
+  cloudflareClient,
+  deployDiscoflare,
+  installerErrorMessage,
+  loadDiscoflareRelease,
+  parseDeployRequest,
+} from '@discoflare/installer-core'
 import type { DeployProgressReporter, DeployProgressStep, DeployRequest, DeployResponse } from '../../shared/installer'
-import { cloudflareClient } from './cloudflare-client'
-import { deployDiscoflare } from './discoflare-deploy'
 import { installerConfig } from './installer-config'
-import { loadDiscoflareRelease } from './discoflare-release'
 import { requireCloudflareToken } from './installer-session'
 import { recordInstallerDeployment } from './telemetry-registry'
 
 export function deploymentErrorMessage(cause: unknown) {
-  const value = cause as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
-  return value?.data?.statusMessage || value?.statusMessage || value?.message || 'Deployment failed.'
-}
-
-export function parseDeployRequest(value: unknown): DeployRequest {
-  const body = value as Partial<DeployRequest> | null
-  if (!body || typeof body !== 'object') throw createError({ statusCode: 400, statusMessage: 'Invalid deploy request' })
-  const accountId = String(body.accountId || '').trim()
-  const workerName = String(body.workerName || '').trim().toLowerCase()
-  const appName = String(body.appName || '').trim()
-  const authMode = body.authMode === undefined ? 'builtin' : body.authMode
-  if (authMode !== 'builtin' && authMode !== 'access') {
-    throw createError({ statusCode: 400, statusMessage: 'Select a sign-in mode' })
-  }
-  const customDomainEnabled = body.customDomainEnabled === true
-  const zoneId = String(body.zoneId || '').trim()
-  const zoneName = String(body.zoneName || '').trim().toLowerCase()
-  const appSubdomain = String(body.appSubdomain || '').trim().toLowerCase()
-  const mailEnabled = body.mailEnabled === true
-  const mailSubdomain = String(body.mailSubdomain || '').trim().toLowerCase()
-  const mailLocalPart = String(body.mailLocalPart || '').trim().toLowerCase()
-  if (!/^[0-9a-f]{32}$/.test(accountId)) throw createError({ statusCode: 400, statusMessage: 'Select a Cloudflare account' })
-  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(workerName)) {
-    throw createError({ statusCode: 400, statusMessage: 'Worker name must use lowercase letters, numbers, and hyphens' })
-  }
-  if (!appName || appName.length > 80) throw createError({ statusCode: 400, statusMessage: 'App name must be 1–80 characters' })
-  const zoneRequired = customDomainEnabled || mailEnabled
-  if (zoneRequired && !/^[0-9a-f]{32}$/.test(zoneId)) throw createError({ statusCode: 400, statusMessage: 'Select a Cloudflare domain' })
-  if (zoneRequired && !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(zoneName)) throw createError({ statusCode: 400, statusMessage: 'Invalid Cloudflare domain' })
-  if (customDomainEnabled && !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(appSubdomain)) throw createError({ statusCode: 400, statusMessage: 'App subdomain must use lowercase letters, numbers, and hyphens' })
-  if (mailEnabled && !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(mailSubdomain)) throw createError({ statusCode: 400, statusMessage: 'Email subdomain must use lowercase letters, numbers, and hyphens' })
-  if (mailEnabled && !/^[a-z0-9](?:[a-z0-9.!#$%&'*+/=?^_`{|}~-]{0,62}[a-z0-9])?$/.test(mailLocalPart)) throw createError({ statusCode: 400, statusMessage: 'Enter a valid default mailbox' })
-  const registrationMode = body.registrationMode === undefined ? 'invite_only' : body.registrationMode
-  if (authMode === 'builtin' && registrationMode !== 'invite_only' && registrationMode !== 'open') {
-    throw createError({ statusCode: 400, statusMessage: 'Select a registration mode' })
-  }
-  const adminEmail = String(body.adminEmail || '').trim().toLowerCase().slice(0, 254)
-  if (adminEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail)) throw createError({ statusCode: 400, statusMessage: 'Enter a valid owner email' })
-  const allowedEmails = authMode === 'access' && Array.isArray(body.allowedEmails)
-    ? [...new Set(body.allowedEmails.map(value => String(value).trim().toLowerCase()).filter(Boolean))]
-    : []
-  if (allowedEmails.length > 20 || allowedEmails.some(email => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
-    throw createError({ statusCode: 400, statusMessage: 'Enter at most 20 valid Access member emails' })
-  }
-  const targetVersion = typeof body.targetVersion === 'string' && /^v?\d+\.\d+\.\d+$/.test(body.targetVersion)
-    ? body.targetVersion
-    : undefined
-  if (body.targetVersion && !targetVersion) throw createError({ statusCode: 400, statusMessage: 'Invalid Discoflare release version' })
-  return {
-    accountId,
-    workerName,
-    appName,
-    authMode,
-    registrationMode: authMode === 'access' ? 'open' : registrationMode,
-    adminEmail,
-    allowedEmails: allowedEmails.filter(email => email !== adminEmail),
-    customDomainEnabled,
-    zoneId,
-    zoneName,
-    appSubdomain,
-    mailEnabled,
-    mailSubdomain,
-    mailLocalPart,
-    targetVersion,
-  }
+  return installerErrorMessage(cause)
 }
 
 export async function runInstallerDeployment(
