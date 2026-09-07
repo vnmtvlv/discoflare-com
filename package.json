@@ -15,6 +15,7 @@
     "generate": "nuxt generate --preset=static",
     "postinstall": "nuxt prepare",
     "preview": "nuxt preview",
+    "test": "vitest run",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "@types/node": "^20.19.43",
     "better-sqlite3": "^13.0.3",
     "typescript": "^5.9.2",
+    "vitest": "4.1.11",
     "vue-tsc": "^3.3.11"
   },
   "pnpm": {
