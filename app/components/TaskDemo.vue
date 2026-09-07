@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const steps = [
   { label: 'Configuration snapshotted', icon: 'i-ph-check-circle', tone: 'text-primary' },
-  { label: 'Running tools in the sandbox', icon: 'i-ph-spinner-gap', tone: 'text-primary' },
+  { label: 'Running tools in Agent Computer', icon: 'i-ph-spinner-gap', tone: 'text-primary' },
   { label: 'Review', icon: 'i-ph-circle-dashed', tone: 'text-dimmed' },
 ]
 </script>

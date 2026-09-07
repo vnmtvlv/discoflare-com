@@ -1,5 +1,5 @@
 import type { CloudflareInstallation } from '../../../shared/installer'
-import { findDiscoflareInstallations } from '../../utils/discoflare-installations'
+import { findDiscoflareInstallations } from '@discoflare/installer-core'
 import { requireCloudflareToken } from '../../utils/installer-session'
 
 export default defineEventHandler(async (event): Promise<{ installations: CloudflareInstallation[] }> => {

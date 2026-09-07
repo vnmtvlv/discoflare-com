@@ -1,7 +1,5 @@
 import type { UninstallRequest, UninstallResponse } from '../../../shared/installer'
-import { cloudflareClient } from '../../utils/cloudflare-client'
-import { findDiscoflareInstallations, installationHostname } from '../../utils/discoflare-installations'
-import { uninstallDiscoflare } from '../../utils/discoflare-uninstall'
+import { cloudflareClient, findDiscoflareInstallations, installationHostname, uninstallDiscoflare } from '@discoflare/installer-core'
 import { requireCloudflareToken } from '../../utils/installer-session'
 import { assertInstallerMutation } from '../../utils/installer-security'
 import { recordInstallerDeletion } from '../../utils/telemetry-registry'

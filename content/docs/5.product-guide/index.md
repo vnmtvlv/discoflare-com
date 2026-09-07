@@ -42,7 +42,8 @@ Hiding a button is only a convenience. The server repeats the authorization chec
 Discoflare does not treat one storage service as the entire application:
 
 - D1 stores durable workspace facts and history.
-- R2 stores attachments, raw email, avatars, and Agent computer checkpoints.
+- R2 stores attachments, raw email, avatars, and large Agent artifacts.
+- Agent Computer files live in the Agent Durable Object's SQLite storage.
 - Durable Objects coordinate live conversations, presence, notifications, and Agent execution state.
 - KV stores short-lived connection tickets.
 

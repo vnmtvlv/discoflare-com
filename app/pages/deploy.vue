@@ -130,7 +130,7 @@ const deploymentItems = computed<Array<{ step: DeployProgressStep, label: string
   { step: 'worker', label: 'Deploying the Discoflare Worker' },
   { step: 'domain', label: form.customDomainEnabled ? `Publishing ${appHostname.value}` : 'Publishing your workers.dev address' },
   ...(form.mailEnabled ? [{ step: 'mail' as const, label: `Setting up workspace email for ${mailDomain.value}` }] : []),
-  { step: 'sandbox', label: 'Deploying the agent sandbox' },
+  { step: 'computer', label: 'Deploying Agent Computer' },
   { step: 'schedule', label: 'Scheduling workspace maintenance' },
   { step: 'verify', label: 'Verifying your deployment' },
 ])

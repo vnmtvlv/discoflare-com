@@ -1,5 +1,5 @@
 import type { CloudflareAccount, CloudflareZone, InstallerSessionResponse } from '../../../shared/installer'
-import { cloudflareClient } from '../../utils/cloudflare-client'
+import { cloudflareClient } from '@discoflare/installer-core'
 import { useInstallerSession } from '../../utils/installer-session'
 
 export default defineEventHandler(async (event): Promise<InstallerSessionResponse> => {
