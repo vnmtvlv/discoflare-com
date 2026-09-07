@@ -3,6 +3,7 @@ import type { DeployProgressReporter, DeployProgressStep, DeployRequest, Install
 import { cloudflareApi } from './cloudflare-client'
 import { randomBase64Url } from './cloudflare-oauth'
 import { ensureCloudflareAccess, ensureWorkersHostname } from './discoflare-access'
+import { ensureMailGateway, mailGatewayName, type MailGatewayProvision } from './discoflare-mail-gateway'
 
 type WorkerUploadResult = {
   deployment_id?: string
@@ -31,6 +32,7 @@ export type ExistingWorkerBinding = {
   bucket_name?: string
   namespace_id?: string
   workflow_name?: string
+  service?: string
 }
 
 type ExistingWorker = {
@@ -49,6 +51,8 @@ type ExistingWorker = {
   accessApplicationId?: string
   accessHealthApplicationId?: string
   accessDeletionApplicationId?: string
+  mailGatewayName?: string
+  mailGatewayTokenBound?: boolean
 }
 
 type EmailRoutingSettings = { enabled?: boolean; status?: string }
@@ -116,6 +120,8 @@ async function inspectWorker(client: Cloudflare, accountId: string, workerName: 
       accessApplicationId: text('CF_ACCESS_APP_ID'),
       accessHealthApplicationId: text('CF_ACCESS_HEALTH_APP_ID'),
       accessDeletionApplicationId: text('CF_ACCESS_DELETION_APP_ID'),
+      mailGatewayName: text('MAIL_GATEWAY_NAME'),
+      mailGatewayTokenBound: bindings.some(binding => binding.name === 'MAIL_GATEWAY_TOKEN' && binding.type === 'secret_text'),
     }
   }
   return { exists: false }
@@ -174,7 +180,8 @@ async function assertDomainAvailable(accessToken: string, request: DeployRequest
   if (routing.enabled) {
     const catchAll = await cloudflareApi<EmailCatchAll>(accessToken, `/zones/${request.zoneId}/email/routing/rules/catch_all`)
     const target = catchAll.actions?.find(action => action.type === 'worker')?.value?.[0]
-    if (catchAll.enabled && target && target !== request.workerName) {
+    const gatewayName = mailGatewayName(request.zoneId)
+    if (catchAll.enabled && target && target !== request.workerName && target !== gatewayName) {
       throw createError({ statusCode: 409, statusMessage: `${request.zoneName} already routes catch-all email to Worker ${target}` })
     }
     if (catchAll.enabled && !target) {
@@ -218,14 +225,14 @@ async function attachAppDomain(accessToken: string, request: DeployRequest) {
   })
 }
 
-async function attachMailCatchAll(accessToken: string, request: DeployRequest) {
+async function attachMailCatchAll(accessToken: string, request: DeployRequest, gatewayName: string) {
   await cloudflareApi(accessToken, `/zones/${request.zoneId}/email/routing/rules/catch_all`, {
     method: 'PUT',
     body: JSON.stringify({
-      name: `Discoflare workspace mail for ${mailDomain(request)}`,
+      name: `Discoflare zone mail gateway for ${request.zoneName}`,
       enabled: true,
       matchers: [{ type: 'all' }],
-      actions: [{ type: 'worker', value: [request.workerName] }],
+      actions: [{ type: 'worker', value: [gatewayName] }],
     }),
   })
 }
@@ -309,7 +316,7 @@ async function uploadAssets(accessToken: string, accountId: string, workerName: 
   return completionToken
 }
 
-async function ensureAccessWorkerTarget(accessToken: string, accountId: string, workerName: string, compatibilityDate: string) {
+async function ensureBootstrapWorkerTarget(accessToken: string, accountId: string, workerName: string, compatibilityDate: string) {
   const metadata = {
     main_module: 'discoflare-bootstrap.mjs',
     compatibility_date: compatibilityDate,
@@ -371,6 +378,7 @@ async function uploadWorker(
   ownerSetupToken: string | null,
   telemetry: { installationId: string, token: string },
   access: { issuer: string, audience: string, applicationId: string, healthApplicationId: string, deletionApplicationId: string } | null,
+  mailGateway: MailGatewayProvision | null,
 ) {
   const hostname = new URL(resources.origin).hostname
   const bindings: Array<Record<string, unknown>> = [
@@ -407,12 +415,14 @@ async function uploadWorker(
   }
   if (request.mailEnabled) {
     bindings.push(
-      { type: 'send_email', name: 'MAIL_EMAIL' },
+      { type: 'service', name: 'MAIL_GATEWAY', service: mailGateway!.name },
       { type: 'plain_text', name: 'MAIL_DOMAIN', text: mailDomain(request) },
       { type: 'plain_text', name: 'MAIL_ZONE_ID', text: request.zoneId },
       { type: 'plain_text', name: 'MAIL_APP_HOSTNAME', text: hostname },
       { type: 'plain_text', name: 'MAIL_DEFAULT_LOCAL_PART', text: request.mailLocalPart },
+      { type: 'plain_text', name: 'MAIL_GATEWAY_NAME', text: mailGateway!.name },
     )
+    if (mailGateway?.token) bindings.push({ type: 'secret_text', name: 'MAIL_GATEWAY_TOKEN', text: mailGateway.token })
   }
   if (!existing.exists) {
     bindings.push(
@@ -558,6 +568,9 @@ export async function deployDiscoflare(
   }
 
   await progress('installation', 'active')
+  if (request.mailEnabled && !release.manifest.capabilities?.includes('zone-mail-gateway-v1')) {
+    throw createError({ statusCode: 409, statusMessage: `Discoflare ${release.manifest.version} does not support shared zone mail gateways` })
+  }
   const existing = await inspectWorker(client, request.accountId, request.workerName)
   if (existing.exists && existing.authMode !== request.authMode) {
     throw createError({ statusCode: 409, statusMessage: 'Changing authentication mode on an existing installation requires a manual migration.' })
@@ -617,8 +630,9 @@ export async function deployDiscoflare(
   await progress('database', 'complete', appliedMigrations.length ? `${appliedMigrations.length} applied` : 'Up to date')
 
   await progress('assets', 'active')
-  const accessWorkerId = request.authMode === 'access' && !request.customDomainEnabled && !existing.exists
-    ? await ensureAccessWorkerTarget(accessToken, request.accountId, request.workerName, release.manifest.compatibilityDate)
+  const bootstrapRequired = !existing.exists && (request.mailEnabled || (request.authMode === 'access' && !request.customDomainEnabled))
+  const accessWorkerId = bootstrapRequired
+    ? await ensureBootstrapWorkerTarget(accessToken, request.accountId, request.workerName, release.manifest.compatibilityDate)
     : undefined
   const assetsJwt = await uploadAssets(accessToken, request.accountId, request.workerName, release.assets)
   await progress('assets', 'complete')
@@ -641,13 +655,23 @@ export async function deployDiscoflare(
   await progress('access', 'complete', request.authMode === 'access' ? 'Email code sign-in ready' : 'Using Discoflare accounts')
 
   await progress('worker', 'active')
+  const gatewayName = request.mailEnabled ? mailGatewayName(request.zoneId) : ''
+  const mailGateway = request.mailEnabled
+    ? await ensureMailGateway(
+        client,
+        accessToken,
+        request,
+        release.manifest.compatibilityDate,
+        existing.mailGatewayName === gatewayName && Boolean(existing.mailGatewayTokenBound),
+      )
+    : null
   const uploaded = await uploadWorker(accessToken, request.accountId, request, release.manifest, release.worker, {
     databaseId,
     bucketName,
     kvId,
     assetsJwt,
     origin,
-  }, existing, ownerSetupToken, telemetry, access)
+  }, existing, ownerSetupToken, telemetry, access, mailGateway)
   await progress('worker', 'complete', `Discoflare ${release.manifest.version}`)
 
   await progress('domain', 'active')
@@ -665,7 +689,7 @@ export async function deployDiscoflare(
       ensureEmailRouting(accessToken, request),
       ensureEmailSending(accessToken, request),
     ])
-    await attachMailCatchAll(accessToken, request)
+    await attachMailCatchAll(accessToken, request, mailGateway!.name)
   }
   await progress('mail', 'complete', request.mailEnabled ? mailDomain(request) : 'Skipped')
 

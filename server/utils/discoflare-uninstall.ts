@@ -1,6 +1,7 @@
 import type Cloudflare from 'cloudflare'
 import type { CloudflareInstallation } from '../../shared/installer'
 import { cloudflareApi } from './cloudflare-client'
+import { removeMailGatewayRoute } from './discoflare-mail-gateway'
 
 type ContainerApplication = { id: string, name: string }
 
@@ -27,15 +28,28 @@ async function detachDomains(client: Cloudflare, installation: CloudflareInstall
   }
 }
 
-async function detachEmail(client: Cloudflare, installation: CloudflareInstallation, deleted: string[]) {
+async function detachEmail(client: Cloudflare, accessToken: string, installation: CloudflareInstallation, deleted: string[]) {
   const zoneId = installation.resources.mailZoneId
   const mailDomain = installation.resources.mailDomain
   if (!zoneId || !mailDomain) return
 
+  const removal = await removeMailGatewayRoute(
+    client,
+    accessToken,
+    installation.accountId,
+    zoneId,
+    installation.configuration.zoneName,
+    installation.workerName,
+    mailDomain,
+  )
+  if (removal.removed) deleted.push(`mail gateway route for ${mailDomain}`)
+
   await unlessMissing(async () => {
     const catchAll = await client.emailRouting.rules.catchAlls.get({ zone_id: zoneId })
-    const owned = catchAll.actions?.some(action => action.type === 'worker' && action.value?.includes(installation.workerName))
-    if (!owned) return
+    const targets = catchAll.actions?.filter(action => action.type === 'worker').flatMap(action => action.value || []) || []
+    const ownedDirectly = targets.includes(installation.workerName)
+    const ownedGateway = targets.includes(removal.gatewayName)
+    if (!ownedDirectly && !(ownedGateway && removal.lastRoute)) return
     await client.emailRouting.rules.catchAlls.update({
       zone_id: zoneId,
       actions: catchAll.actions || [{ type: 'drop' }],
@@ -44,7 +58,7 @@ async function detachEmail(client: Cloudflare, installation: CloudflareInstallat
       name: catchAll.name,
       source: catchAll.source,
     })
-    deleted.push(`email catch-all for ${mailDomain}`)
+    deleted.push(`email catch-all for ${installation.configuration.zoneName}`)
   })
 
   for await (const subdomain of client.emailSending.subdomains.list({ zone_id: zoneId })) {
@@ -111,7 +125,7 @@ export async function uninstallDiscoflare(
 
   await detachAccess(client, installation, deleted)
   await detachDomains(client, installation, deleted)
-  await detachEmail(client, installation, deleted)
+  await detachEmail(client, accessToken, installation, deleted)
 
   await client.workers.scripts.delete(installation.workerName, { account_id: installation.accountId, force: true })
   deleted.push(`Worker ${installation.workerName} and its Durable Object state`)
