@@ -75,7 +75,7 @@ const docsNavigation = computed(() => {
 
     <UFooter class="border-t border-muted">
       <template #left><BrandLogo /></template>
-      <p class="text-xs text-muted">Product, operator, and roadmap documentation.</p>
+      <p class="text-xs text-muted">Product and operator documentation.</p>
       <template #right>
         <UButton to="/" label="Home" color="neutral" variant="ghost" />
         <UButton :to="repoUrl" target="_blank" aria-label="Discoflare on GitHub" icon="i-ph-github-logo" color="neutral" variant="ghost" />
@@ -84,7 +84,7 @@ const docsNavigation = computed(() => {
 
     <UContentSearch
       title="Search documentation"
-      description="Find product guides, Agent behavior, setup steps, roadmap items, and operational checks."
+      description="Find product guides, Agent behavior, setup steps, and operational checks."
       :navigation="docsNavigation"
       :files="searchSections || []"
     />

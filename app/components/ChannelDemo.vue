@@ -1,16 +1,16 @@
 <script setup lang="ts">
 const results = [
   {
-    when: 'March 2019',
-    author: 'Alex',
-    message: 'We agreed to price per workspace, never per seat. Writing it down so we can point at it later.',
-    meta: '7 replies in thread',
+    when: 'Earlier',
+    author: 'Member',
+    message: 'The deployment checklist and rollback steps are attached to the release thread.',
+    meta: '3 replies in thread',
   },
   {
-    when: 'Yesterday',
-    author: 'Jun',
-    message: 'Found it — the 2019 thread. Nothing has changed since.',
-    meta: 'In #launch',
+    when: 'Today',
+    author: 'Agent',
+    message: 'Found the thread and linked the verification steps.',
+    meta: 'In #operations',
   },
 ]
 </script>
@@ -20,9 +20,9 @@ const results = [
     <div class="mb-5 flex items-center justify-between border-b border-muted pb-4">
       <div class="flex items-center gap-2">
         <UIcon name="i-ph-magnifying-glass" class="text-muted" />
-        <strong class="text-sm">per seat</strong>
+        <strong class="text-sm">deployment checklist</strong>
       </div>
-      <span class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">1,284 matches</span>
+      <span class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">2 matches</span>
     </div>
 
     <div class="flex flex-1 flex-col justify-center gap-3">
@@ -40,7 +40,7 @@ const results = [
 
       <div class="flex items-center gap-2 text-xs text-muted">
         <UIcon name="i-ph-infinity" class="size-4 shrink-0 text-primary" />
-        Seven years back, still searchable. There is no retention window to upgrade past.
+        Workspace history stays searchable in your own database.
       </div>
     </div>
   </div>

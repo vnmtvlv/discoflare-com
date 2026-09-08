@@ -34,7 +34,7 @@ The public infrastructure counters use the `discoflare-com-telemetry` D1 databas
 
 ## Product demos
 
-Demo sections use coded previews until real product recordings are ready. See [`public/demos/README.md`](public/demos/README.md) for the video convention.
+Demo sections use coded previews. See [`public/demos/README.md`](public/demos/README.md) for the video convention.
 
 Brand assets are copied from the Discoflare product repository so this site can deploy independently.
 

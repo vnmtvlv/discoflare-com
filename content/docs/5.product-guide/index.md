@@ -23,7 +23,6 @@ An app is not a separate deployment. Chat messages, Task records, Mail conversat
 - [Apps](/docs/product-guide/apps) explains Chat, Tasks, Mail, Databases, and what the app switcher does.
 - [Agents](/docs/product-guide/agents) explains how to create an Agent, talk to it, and control its access.
 - [Tasks](/docs/product-guide/tasks) explains boards and durable Agent runs.
-- [Roadmap](/docs/roadmap) shows which additions are released, in development, or exploratory.
 
 ## Shared authorization
 

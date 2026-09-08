@@ -45,18 +45,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://discoflare.com/docs/roadmap</loc>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://discoflare.com/docs/roadmap/agents</loc>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://discoflare.com/docs/roadmap/apps</loc>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://discoflare.com/trust</loc>
     <priority>0.6</priority>
   </url>
