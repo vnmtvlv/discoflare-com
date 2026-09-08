@@ -100,7 +100,7 @@ Text chat does not require RealtimeKit. Voice huddles remain unavailable until t
 
 ## Availability
 
-The current release is a web application. Desktop, iOS, and Android clients are planned but are not currently available. Discoflare does not currently expose an installable app marketplace or a third-party plugin API.
+The current release is a web application. Discoflare does not expose an installable app marketplace or a third-party plugin API.
 
 ## Deployment
 

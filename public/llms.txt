@@ -11,11 +11,10 @@ Discoflare is MIT-licensed software with no seat, member, message-retention, mai
 
 ## Documentation
 
-- [Discoflare documentation](https://discoflare.com/docs): Product guides, guided and manual deployment, configuration, verification, operations, and roadmap status.
+- [Discoflare documentation](https://discoflare.com/docs): Product guides, guided and manual deployment, configuration, verification, and operations.
 - [Apps guide](https://discoflare.com/docs/product-guide/apps): Released Chat, Tasks, Mail, and Databases surfaces and how they share the workspace.
 - [Agents guide](https://discoflare.com/docs/product-guide/agents): Agent profiles, Chat behavior, memory, Sandboxes, permissions, and approvals.
 - [Tasks guide](https://discoflare.com/docs/product-guide/tasks): Boards, assignment, durable Agent runs, results, cancellation, and recovery.
-- [Roadmap](https://discoflare.com/docs/roadmap): Status definitions and links to the Agents and Apps roadmaps.
 - [Architecture source](https://github.com/vnmtvlv/discoflare/blob/main/docs/architecture.md): Runtime topology, Cloudflare services, data ownership, and request flows.
 - [Deployment source](https://github.com/vnmtvlv/discoflare/blob/main/docs/deployment.md): Maintainer-level deployment details and release procedures.
 

@@ -143,7 +143,7 @@ const comparison = [
   },
   {
     capability: 'The source',
-    elsewhere: 'Closed. You get the roadmap you are given',
+    elsewhere: 'Closed. Product direction is controlled by the vendor',
     here: 'MIT licensed. Read it, run it, change it',
   },
 ]
@@ -258,10 +258,6 @@ const faqItems: AccordionItem[] = [
   {
     label: 'How do I get updates?',
     content: 'Updates are applied in place against the same Cloudflare resources, so a workspace upgrades without migrating to a new deployment. Tagged releases in the repository are the source of what has shipped.',
-  },
-  {
-    label: 'Are native apps available?',
-    content: 'Not yet. Desktop, iOS, and Android clients are planned for later; the current release is the web application.',
   },
 ]
 
@@ -434,10 +430,6 @@ useHead({
             </div>
           </dl>
 
-          <div class="relative mx-auto mt-16 max-w-6xl sm:mt-20">
-            <div class="orange-glow pointer-events-none absolute -inset-24 -z-10 blur-3xl" />
-            <ProductPreview />
-          </div>
         </UContainer>
       </section>
 
