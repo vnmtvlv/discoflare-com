@@ -49,6 +49,8 @@ const form = reactive<DeployRequest>({
   mailEnabled: false,
   mailSubdomain: 'discoflare',
   mailLocalPart: 'inbox',
+  realtimekitEnabled: false,
+  realtimekitApiToken: '',
   targetVersion: upgradeTarget || undefined,
 })
 const wizardStep = ref<0 | 1 | 2 | 3 | 4>(0)
@@ -73,6 +75,12 @@ const accountZones = computed(() => session.value.zones.filter(zone => zone.acco
 const appHostname = computed(() => form.customDomainEnabled && form.zoneName ? `${form.appSubdomain}.${form.zoneName}` : '')
 const mailDomain = computed(() => form.zoneName ? `${form.mailSubdomain}.${form.zoneName}` : '')
 const mailboxAddress = computed(() => mailDomain.value ? `${form.mailLocalPart}@${mailDomain.value}` : '')
+const existingRealtimeKit = computed(() => installation.value?.configuration.realtimekitEnabled === true)
+const realtimeTokenUrl = computed(() => {
+  const permissions = encodeURIComponent(JSON.stringify([{ key: 'realtime', type: 'edit' }]))
+  const name = encodeURIComponent(`Discoflare ${form.workerName} RealtimeKit`)
+  return `https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=${permissions}&name=${name}`
+})
 
 watch(() => form.appSubdomain, (subdomain, previous) => {
   if (!form.mailSubdomain || form.mailSubdomain === previous) form.mailSubdomain = subdomain
@@ -97,10 +105,11 @@ const instanceReady = computed(() => {
 })
 
 const optionsReady = computed(() => Boolean(
-  (!form.customDomainEnabled && !form.mailEnabled)
-  || (form.zoneId
-    && (!form.customDomainEnabled || form.appSubdomain)
-    && (!form.mailEnabled || (form.mailSubdomain && form.mailLocalPart))),
+  (!form.realtimekitEnabled || existingRealtimeKit.value || form.realtimekitApiToken.trim())
+  && ((!form.customDomainEnabled && !form.mailEnabled)
+    || (form.zoneId
+      && (!form.customDomainEnabled || form.appSubdomain)
+      && (!form.mailEnabled || (form.mailSubdomain && form.mailLocalPart)))),
 ))
 
 const pageTitle = computed(() => {
@@ -127,6 +136,7 @@ const deploymentItems = computed<Array<{ step: DeployProgressStep, label: string
   { step: 'database', label: 'Applying database migrations' },
   { step: 'assets', label: 'Uploading the web application' },
   { step: 'access', label: form.authMode === 'access' ? 'Setting up Cloudflare Access' : 'Configuring Discoflare accounts' },
+  ...(form.realtimekitEnabled ? [{ step: 'realtimekit' as const, label: existingRealtimeKit.value ? 'Keeping RealtimeKit Huddles connected' : 'Creating and verifying RealtimeKit Huddles' }] : []),
   { step: 'worker', label: 'Deploying the Discoflare Worker' },
   { step: 'domain', label: form.customDomainEnabled ? `Publishing ${appHostname.value}` : 'Publishing your workers.dev address' },
   ...(form.mailEnabled ? [{ step: 'mail' as const, label: `Setting up workspace email for ${mailDomain.value}` }] : []),
@@ -142,6 +152,7 @@ async function disconnect() {
   await $fetch('/api/cloudflare/logout', { method: 'POST' })
   result.value = null
   installation.value = null
+  form.realtimekitApiToken = ''
   wizardStep.value = 0
   await refresh()
 }
@@ -185,6 +196,7 @@ function handleDeployEvent(message: DeployProgressEvent) {
   }
   if (message.type === 'error') throw new Error(message.message)
   result.value = message.result
+  form.realtimekitApiToken = ''
   wizardStep.value = 4
 }
 
@@ -392,7 +404,23 @@ useSeoMeta({
                   <div class="flex justify-between gap-4"><span class="text-muted">Data</span><span class="text-default">Existing D1, R2, and KV</span></div>
                 </div>
 
-                <form v-else class="mt-6 space-y-6" @submit.prevent="deploy">
+                <div class="mt-6 space-y-5 rounded-xl border border-default p-5">
+                  <USwitch
+                    v-model="form.realtimekitEnabled"
+                    label="RealtimeKit Huddles"
+                    :disabled="existingRealtimeKit"
+                    :description="existingRealtimeKit ? 'The existing Worker secret and RealtimeKit app stay connected.' : 'Add voice, video, and screen sharing with a Realtime-only Cloudflare API token.'"
+                  />
+                  <div v-if="form.realtimekitEnabled && !existingRealtimeKit" class="space-y-4 border-t border-muted pt-5">
+                    <p class="text-sm leading-6 text-muted">Cloudflare requires a persistent API token for the workspace backend. Create one with only <strong class="font-medium text-default">Account → Realtime → Edit</strong>, then paste the value shown once. The installer sends it directly to the Worker secret and does not retain it.</p>
+                    <UButton :to="realtimeTokenUrl" target="_blank" external label="Create Realtime token" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" />
+                    <UFormField label="Realtime API token" required hint="Stored only as the installed Worker's encrypted secret.">
+                      <UInput v-model="form.realtimekitApiToken" type="password" autocomplete="off" class="w-full" />
+                    </UFormField>
+                  </div>
+                </div>
+
+                <form v-if="!isUpgrade" class="mt-6 space-y-6" @submit.prevent="deploy">
                   <div class="space-y-5">
                     <USwitch v-model="form.customDomainEnabled" label="Custom domain" description="Otherwise the workspace uses your account’s workers.dev address." />
                     <div class="border-t border-muted pt-5"><USwitch v-model="form.mailEnabled" label="Workspace email" description="Create a mailbox and route this domain’s catch-all email to Discoflare." /></div>

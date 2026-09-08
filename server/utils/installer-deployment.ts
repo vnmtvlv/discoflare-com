@@ -63,6 +63,7 @@ export async function runInstallerDeployment(
       workerName: request.workerName,
       version: deployed.version,
       email: request.mailEnabled,
+      huddles: request.realtimekitEnabled,
     })
   }
   catch (error) {
