@@ -77,7 +77,7 @@ const mailDomain = computed(() => form.zoneName ? `${form.mailSubdomain}.${form.
 const mailboxAddress = computed(() => mailDomain.value ? `${form.mailLocalPart}@${mailDomain.value}` : '')
 const existingRealtimeKit = computed(() => installation.value?.configuration.realtimekitEnabled === true)
 const realtimeTokenUrl = computed(() => {
-  const permissions = encodeURIComponent(JSON.stringify([{ key: 'realtime', type: 'edit' }]))
+  const permissions = encodeURIComponent(JSON.stringify([{ key: 'realtime', type: 'admin' }]))
   const name = encodeURIComponent(`Discoflare ${form.workerName} RealtimeKit`)
   return `https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=${permissions}&name=${name}`
 })
@@ -412,7 +412,7 @@ useSeoMeta({
                     :description="existingRealtimeKit ? 'The existing Worker secret and RealtimeKit app stay connected.' : 'Add voice, video, and screen sharing with a Realtime-only Cloudflare API token.'"
                   />
                   <div v-if="form.realtimekitEnabled && !existingRealtimeKit" class="space-y-4 border-t border-muted pt-5">
-                    <p class="text-sm leading-6 text-muted">Cloudflare requires a persistent API token for the workspace backend. Create one with only <strong class="font-medium text-default">Account → Realtime → Edit</strong>, then paste the value shown once. The installer sends it directly to the Worker secret and does not retain it.</p>
+                    <p class="text-sm leading-6 text-muted">Cloudflare requires a persistent API token for the workspace backend. Create one with only <strong class="font-medium text-default">Account → Realtime → Admin</strong>, then paste the value shown once. The installer sends it directly to the Worker secret and does not retain it.</p>
                     <UButton :to="realtimeTokenUrl" target="_blank" external label="Create Realtime token" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" />
                     <UFormField label="Realtime API token" required hint="Stored only as the installed Worker's encrypted secret.">
                       <UInput v-model="form.realtimekitApiToken" type="password" autocomplete="off" class="w-full" />
