@@ -23,6 +23,7 @@ export type InstallerTelemetry = {
   workerName: string
   version: string
   email: boolean
+  huddles: boolean
 }
 
 function bindings(event: H3Event): TelemetryBindings {
@@ -67,13 +68,14 @@ export async function recordInstallerDeployment(event: H3Event, record: Installe
        installation_id, account_worker_hash, token_hash, version, deployments,
        has_d1, has_r2, has_kv, has_custom_domain, has_email, has_agents, has_huddles,
        first_seen_at, last_deployed_at, last_heartbeat_at
-     ) VALUES (?, ?, ?, ?, 1, 1, 1, 1, 1, ?, 1, 0, ?, ?, ?)
+     ) VALUES (?, ?, ?, ?, 1, 1, 1, 1, 1, ?, 1, ?, ?, ?, ?)
      ON CONFLICT(account_worker_hash) DO UPDATE SET
        installation_id = excluded.installation_id,
        token_hash = excluded.token_hash,
        version = excluded.version,
        deployments = installations.deployments + 1,
        has_email = excluded.has_email,
+       has_huddles = excluded.has_huddles,
        last_deployed_at = excluded.last_deployed_at,
        last_heartbeat_at = excluded.last_heartbeat_at`,
   ).bind(
@@ -82,6 +84,7 @@ export async function recordInstallerDeployment(event: H3Event, record: Installe
     tokenHash,
     record.version,
     record.email ? 1 : 0,
+    record.huddles ? 1 : 0,
     now,
     now,
     now,
