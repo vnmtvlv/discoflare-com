@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeRouteLeave } from 'vue-router'
 import type {
   CloudflareInstallation,
   DeployProgressEvent,
@@ -137,6 +138,22 @@ const deploymentItems = computed<Array<{ step: DeployProgressStep, label: string
 
 const completedProgress = computed(() => deploymentItems.value.filter(item => progressState[item.step]?.state === 'complete').length)
 const progressValue = computed(() => Math.round((completedProgress.value / deploymentItems.value.length) * 100))
+const deploymentLeaveWarning = computed(() => isUpgrade
+  ? 'Cloudflare may continue the upgrade after this page closes, but this page cannot show whether verification finished. Stay until the completion screen appears.'
+  : 'Cloudflare may continue provisioning after this page closes, but this page cannot recover the final result or private Owner setup link. Stay until the completion screen appears.')
+
+function warnBeforeUnload(event: BeforeUnloadEvent) {
+  if (!deploying.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeUnload))
+onBeforeRouteLeave(() => {
+  if (!deploying.value) return true
+  return window.confirm(deploymentLeaveWarning.value)
+})
 
 async function disconnect() {
   await $fetch('/api/cloudflare/logout', { method: 'POST' })
@@ -450,6 +467,16 @@ useSeoMeta({
                   </li>
                 </ul>
 
+                <UAlert
+                  v-if="deploying"
+                  class="mt-7"
+                  color="warning"
+                  variant="subtle"
+                  icon="i-ph-warning"
+                  title="Keep this tab open"
+                  :description="deploymentLeaveWarning"
+                />
+
                 <UAlert v-if="error" class="mt-7" color="error" variant="subtle" title="Deployment stopped" :description="error" />
                 <div v-if="error" class="mt-5 flex gap-3"><UButton label="Try again" icon="i-ph-arrow-clockwise" @click="deploy" /><UButton label="Back" color="neutral" variant="outline" @click="wizardStep = 2" /></div>
               </template>
@@ -477,11 +504,6 @@ useSeoMeta({
                     <p class="text-sm font-medium text-highlighted">Create the workspace Owner</p>
                     <p class="mt-1 text-sm leading-6 text-muted">Use the private setup link above to choose the first password. The link becomes unusable after the Owner is created.</p>
                   </div>
-                </div>
-
-                <div class="mt-5 rounded-xl border border-default p-4 text-sm text-muted">
-                  <p v-if="result.appliedMigrations.length">Applied {{ result.appliedMigrations.length }} D1 {{ result.appliedMigrations.length === 1 ? 'migration' : 'migrations' }}: {{ result.appliedMigrations.join(', ') }}.</p>
-                  <p v-else>No D1 migrations were pending.</p>
                 </div>
 
                 <p class="mt-6 text-center text-xs text-muted">Want to customize your deployment? <NuxtLink to="https://github.com/vnmtvlv/discoflare" external target="_blank" class="text-primary hover:underline">Get the source on GitHub</NuxtLink>.</p>
