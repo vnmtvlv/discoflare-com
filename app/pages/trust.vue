@@ -6,14 +6,9 @@ const description = 'What the guided installer can touch in your Cloudflare acco
 
 const scopeGroups = [
   {
-    purpose: 'Deploy the workspace',
-    scopes: ['workers-scripts.read', 'workers-scripts.write', 'containers.read', 'containers.write'],
-    reason: 'Create and update the Worker that is your workspace, and the Container backend its Agent Computers run through.',
-  },
-  {
-    purpose: 'Create its storage',
-    scopes: ['d1.read', 'd1.write', 'workers-r2.read', 'workers-r2.write', 'workers-kv-storage.read', 'workers-kv-storage.write'],
-    reason: 'Provision the D1 database, R2 buckets, and KV namespace the workspace stores itself in, and apply migrations.',
+    purpose: 'Bootstrap Discoflare Admin',
+    scopes: ['workers-scripts.read', 'workers-scripts.write'],
+    reason: 'Create or repair the small account-local Admin Worker.',
   },
   {
     purpose: 'Choose the account',
@@ -21,14 +16,9 @@ const scopeGroups = [
     reason: 'List the Cloudflare accounts you can deploy into so you can pick one.',
   },
   {
-    purpose: 'Attach the hostname',
-    scopes: ['zone.read', 'zone-settings.read', 'zone-settings.write', 'dns.read', 'dns.write'],
-    reason: 'Point the workspace hostname at the Worker on a domain in the same account.',
-  },
-  {
-    purpose: 'Optional Cloudflare Access sign-in',
+    purpose: 'Protect Discoflare Admin',
     scopes: ['access.read', 'access.write', 'access-acct.read', 'access-acct.write'],
-    reason: 'Create the Access application that sits in front of the workspace when you choose Access instead of built-in sign-in.',
+    reason: 'Create the one-time-PIN Access application that sits in front of Admin.',
   },
 ]
 
@@ -104,14 +94,14 @@ useHead({
     <section>
       <h2>The short version</h2>
       <p>Discoflare is MIT-licensed software that runs in your own Cloudflare account. There is no Discoflare server between you and your workspace, no vendor database holding your messages, and no subprocessor list for your workspace data—because there is no service processing it.</p>
-      <p>That leaves exactly three places where this project touches anything of yours: the guided installer on this website, an anonymous deployment heartbeat, and the source you deploy. All three are itemised below.</p>
+      <p>That leaves four explicit boundaries: the temporary bootstrap on this website, Discoflare Admin in your own account, an anonymous deployment heartbeat, and the source you deploy.</p>
     </section>
 
     <section>
       <h2>What the installer asks for</h2>
       <p>Connecting Cloudflare grants an OAuth token scoped to the permissions below. The token is kept in an encrypted, HTTP-only session cookie in your browser, is never written to a Discoflare database, and the session expires after one hour. Disconnecting revokes it immediately; you can also revoke it yourself from your Cloudflare account at any time.</p>
-      <p>The installer requests one fixed set of scopes for the base deployment and optional Cloudflare Access. It does not request RealtimeKit, Email Routing, or Email Sending permission.</p>
-      <p>If you later connect Cloudflare management, the token template and input live on your installed workspace origin. That broader account-owned token goes directly to your Worker, never through discoflare.com, and enables RealtimeKit plus email when the installation has an eligible domain.</p>
+      <p>The bootstrap uses its fixed OAuth scopes only to create or repair the <code>discoflare-admin</code> Worker and its Cloudflare Access policy. It does not deploy workspaces, create their storage, or request a permanent token.</p>
+      <p>The broader Account Admin Token is created afterward and submitted directly to Discoflare Admin on its own <code>workers.dev</code> origin. It never passes through discoflare.com or enters a workspace Worker. Admin uses it for fixed installation, update, RealtimeKit, email, and repair operations in the selected account.</p>
       <div v-for="group in scopeGroups" :key="group.purpose" class="scope-group">
         <h3>{{ group.purpose }}</h3>
         <p>{{ group.reason }}</p>

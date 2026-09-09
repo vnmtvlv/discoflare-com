@@ -217,10 +217,10 @@ const costRows = [
 ]
 
 const deploySteps = [
-  { number: '01', title: 'Connect Cloudflare', description: 'Choose the Cloudflare account that will own the workspace.' },
-  { number: '02', title: 'Install', description: 'Discoflare provisions the base Worker and its Cloudflare resources without a permanent token.' },
-  { number: '03', title: 'Open your workspace', description: 'Create the first owner on the configured workspace hostname.' },
-  { number: '04', title: 'Connect everything', description: 'Optionally add the Instance Admin Token on your own workspace origin to enable Huddles, updates, and eligible email.' },
+  { number: '01', title: 'Install Admin', description: 'Temporary Cloudflare OAuth creates one small, Access-protected Worker in your account.' },
+  { number: '02', title: 'Connect the account', description: 'Paste one Account Admin Token directly into your own Discoflare Admin origin.' },
+  { number: '03', title: 'Create workspaces', description: 'Admin provisions each complete Discoflare Installation and its owner setup link.' },
+  { number: '04', title: 'Operate everything', description: 'Admin discovers installations, enables Huddles, connects eligible email, and applies updates.' },
 ]
 
 const faqItems: AccordionItem[] = [
@@ -514,7 +514,7 @@ useHead({
             <p class="mb-3 text-sm font-medium text-primary">Ownership</p>
             <h2 class="display-title text-4xl font-semibold text-highlighted sm:text-5xl">Nothing of yours runs on our side.</h2>
             <p class="mt-5 max-w-2xl text-base leading-7 text-muted sm:text-lg">
-              Plenty of tools promise “your data, your rules” and still keep a control plane in the path. Discoflare keeps none. Once the Worker is deployed, discoflare.com could go offline permanently and your workspace would not notice.
+              Plenty of tools promise “your data, your rules” and still keep a vendor control plane in the path. Discoflare Admin runs inside your own Cloudflare account. Discoflare.com may go offline without interrupting workspace chat or data.
             </p>
           </div>
 
@@ -537,7 +537,7 @@ useHead({
                 </li>
               </ul>
               <p class="mt-7 border-t border-muted pt-6 text-sm leading-6 text-dimmed">
-                None of these sit between you and a deployed workspace, and the installer is optional—the repository deploys the same software without it. What the installer asks for, and what the heartbeat contains, is itemised on the <NuxtLink to="/trust" class="text-primary hover:underline">trust page</NuxtLink>.
+                None of these sit between you and a deployed workspace. The account-local Admin is optional for repository operators, and the source deploys the same workspace software without discoflare.com. The authority boundaries and heartbeat are itemised on the <NuxtLink to="/trust" class="text-primary hover:underline">trust page</NuxtLink>.
               </p>
             </div>
           </div>
