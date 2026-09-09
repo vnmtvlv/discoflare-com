@@ -5,14 +5,6 @@ export const CLOUDFLARE_AUTH_URL = 'https://dash.cloudflare.com/oauth2/auth'
 export const CLOUDFLARE_TOKEN_URL = 'https://dash.cloudflare.com/oauth2/token'
 export const CLOUDFLARE_REVOKE_URL = 'https://dash.cloudflare.com/oauth2/revoke'
 export const CLOUDFLARE_OAUTH_SCOPES = [
-  'd1.read',
-  'd1.write',
-  'containers.read',
-  'containers.write',
-  'workers-kv-storage.read',
-  'workers-kv-storage.write',
-  'workers-r2.read',
-  'workers-r2.write',
   'workers-scripts.read',
   'workers-scripts.write',
   'account-settings.read',
@@ -21,6 +13,18 @@ export const CLOUDFLARE_OAUTH_SCOPES = [
   'access-acct.read',
   'access-acct.write',
   'memberships.read',
+].join(' ')
+
+export const CLOUDFLARE_UNINSTALL_SCOPES = [
+  CLOUDFLARE_OAUTH_SCOPES,
+  'd1.read',
+  'd1.write',
+  'containers.read',
+  'containers.write',
+  'workers-kv-storage.read',
+  'workers-kv-storage.write',
+  'workers-r2.read',
+  'workers-r2.write',
   'zone.read',
   'zone-settings.read',
   'zone-settings.write',
@@ -38,7 +42,7 @@ export function installerOrigin(event: H3Event) {
   }
 }
 
-export function oauthConfig(event: H3Event) {
+export function oauthConfig(event: H3Event, scopes = CLOUDFLARE_OAUTH_SCOPES) {
   const config = installerConfig(event)
   const clientId = config.cloudflareOAuthClientId
   const clientSecret = config.cloudflareOAuthClientSecret
@@ -48,7 +52,7 @@ export function oauthConfig(event: H3Event) {
   return {
     clientId,
     clientSecret,
-    scopes: CLOUDFLARE_OAUTH_SCOPES,
+    scopes,
     redirectUri: `${installerOrigin(event)}/api/cloudflare/oauth/callback`,
   }
 }

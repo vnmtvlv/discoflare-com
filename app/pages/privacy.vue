@@ -46,9 +46,8 @@ useHead({
 
     <section>
       <h2>Cloudflare installer</h2>
-      <p>When you connect Cloudflare, discoflare.com temporarily keeps the OAuth access token in an encrypted, HTTP-only session cookie. The installer uses it to list the accounts you can access and to create or update the Cloudflare resources you request. The token is not stored in a Discoflare database and the session expires after one hour.</p>
-      <p>Owner name, email, and password are sent to Cloudflare as encrypted Worker secrets during a first installation. Discoflare.com does not intentionally retain those values after the deployment request. Disconnecting revokes the OAuth token and clears the installer session.</p>
-      <p>After a successful guided install or update, the site records a random installation ID, an irreversibly keyed account-and-Worker identifier, release version, timestamps, and aggregate Cloudflare resource types. It does not store the Cloudflare account ID, Worker name, configured domain, owner email, or workspace content.</p>
+      <p>When you connect Cloudflare, discoflare.com temporarily keeps the OAuth access token in an encrypted, HTTP-only session cookie. The bootstrap uses it to list available accounts and create or repair only the account-local Discoflare Admin Worker and its Access policy. The token is not stored in a Discoflare database and the session expires after one hour.</p>
+      <p>The chosen Admin email is sent to Cloudflare as the Access allow policy and as a Worker configuration value. The Account Admin Token is created and submitted later on the user's own Discoflare Admin origin; discoflare.com never receives it. Disconnecting revokes the temporary OAuth token and clears the installer session.</p>
     </section>
 
     <section>

@@ -5,7 +5,7 @@ type InstallerBindings = Partial<Record<
   | 'NUXT_CLOUDFLARE_OAUTH_CLIENT_SECRET'
   | 'NUXT_INSTALLER_SESSION_PASSWORD'
   | 'NUXT_INSTALLER_ORIGIN'
-  | 'NUXT_INSTALLER_MANIFEST_URL',
+  | 'NUXT_ADMIN_INSTALLER_MANIFEST_URL',
   string
 >>
 
@@ -25,6 +25,6 @@ export function installerConfig(event: H3Event) {
     cloudflareOAuthClientSecret: env.NUXT_CLOUDFLARE_OAUTH_CLIENT_SECRET || runtime.cloudflareOAuthClientSecret,
     installerSessionPassword: env.NUXT_INSTALLER_SESSION_PASSWORD || runtime.installerSessionPassword,
     installerOrigin: env.NUXT_INSTALLER_ORIGIN || runtime.installerOrigin,
-    installerManifestUrl: env.NUXT_INSTALLER_MANIFEST_URL || runtime.installerManifestUrl,
+    adminInstallerManifestUrl: env.NUXT_ADMIN_INSTALLER_MANIFEST_URL || runtime.adminInstallerManifestUrl,
   }
 }
