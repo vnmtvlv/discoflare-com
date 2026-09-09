@@ -47,7 +47,7 @@ export default defineNuxtConfig({
     cloudflareOAuthClientSecret: '',
     installerSessionPassword: '',
     installerOrigin: 'https://discoflare.com',
-    adminInstallerManifestUrl: 'https://github.com/vnmtvlv/discoflare-admin/releases/latest/download/discoflare-admin-cloudflare-manifest.json',
+    adminInstallerManifestUrl: 'https://github.com/vnmtvlv/discoflare/releases/latest/download/discoflare-admin-cloudflare-manifest.json',
     telemetryHashSecret: '',
   },
   nitro: {
