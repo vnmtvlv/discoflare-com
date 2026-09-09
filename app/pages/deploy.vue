@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeRouteLeave } from 'vue-router'
+import { instanceAdminTokenTemplateUrl } from '@discoflare/installer-core'
 import type {
   CloudflareInstallation,
   DeployProgressEvent,
@@ -38,6 +39,8 @@ const { data: session, status, refresh } = await useFetch<InstallerSessionRespon
 const form = reactive<DeployRequest>({
   accountId: '',
   workerName: 'discoflare',
+  managementMode: 'manual',
+  instanceAdminToken: '',
   adminEmail: '',
   allowedEmails: [],
   appName: 'Discoflare',
@@ -77,6 +80,14 @@ const appHostname = computed(() => form.customDomainEnabled && form.zoneName ? `
 const mailDomain = computed(() => form.zoneName ? `${form.mailSubdomain}.${form.zoneName}` : '')
 const mailboxAddress = computed(() => mailDomain.value ? `${form.mailLocalPart}@${mailDomain.value}` : '')
 const existingRealtimeKit = computed(() => installation.value?.configuration.realtimekitEnabled === true)
+const existingManualRealtimeKit = computed(() => existingRealtimeKit.value && installation.value?.configuration.managementMode === 'manual')
+const needsManualRealtimeToken = computed(() => (
+  form.managementMode === 'manual'
+  && form.realtimekitEnabled
+  && !existingManualRealtimeKit.value
+))
+const needsInstanceAdminToken = computed(() => form.managementMode === 'managed')
+const instanceAdminTokenUrl = computed(() => instanceAdminTokenTemplateUrl(form.workerName))
 const realtimeTokenUrl = computed(() => {
   const permissions = encodeURIComponent(JSON.stringify([{ key: 'realtime', type: 'admin' }]))
   const name = encodeURIComponent(`Discoflare ${form.workerName} RealtimeKit`)
@@ -85,6 +96,16 @@ const realtimeTokenUrl = computed(() => {
 
 watch(() => form.appSubdomain, (subdomain, previous) => {
   if (!form.mailSubdomain || form.mailSubdomain === previous) form.mailSubdomain = subdomain
+})
+
+watch(() => form.managementMode, (mode, previous) => {
+  if (mode === 'managed') {
+    form.realtimekitEnabled = true
+    form.realtimekitApiToken = ''
+  }
+  else if (previous === 'managed' && !isUpgrade) {
+    form.realtimekitEnabled = false
+  }
 })
 
 watch([() => form.accountId, accountZones], ([, zones]) => {
@@ -106,7 +127,8 @@ const instanceReady = computed(() => {
 })
 
 const optionsReady = computed(() => Boolean(
-  (!form.realtimekitEnabled || existingRealtimeKit.value || form.realtimekitApiToken.trim())
+  (!needsInstanceAdminToken.value || form.instanceAdminToken?.trim())
+  && (!needsManualRealtimeToken.value || form.realtimekitApiToken.trim())
   && ((!form.customDomainEnabled && !form.mailEnabled)
     || (form.zoneId
       && (!form.customDomainEnabled || form.appSubdomain)
@@ -137,7 +159,8 @@ const deploymentItems = computed<Array<{ step: DeployProgressStep, label: string
   { step: 'database', label: 'Applying database migrations' },
   { step: 'assets', label: 'Uploading the web application' },
   { step: 'access', label: form.authMode === 'access' ? 'Setting up Cloudflare Access' : 'Configuring Discoflare accounts' },
-  ...(form.realtimekitEnabled ? [{ step: 'realtimekit' as const, label: existingRealtimeKit.value ? 'Keeping RealtimeKit Huddles connected' : 'Creating and verifying RealtimeKit Huddles' }] : []),
+  { step: 'management', label: form.managementMode === 'managed' ? 'Verifying the instance admin token' : 'Configuring manual management' },
+  ...(form.realtimekitEnabled ? [{ step: 'realtimekit' as const, label: form.managementMode === 'managed' ? 'Connecting Huddles to the instance admin token' : existingManualRealtimeKit.value ? 'Keeping the manual Realtime token' : 'Creating and verifying RealtimeKit Huddles' }] : []),
   { step: 'worker', label: 'Deploying the Discoflare Worker' },
   { step: 'domain', label: form.customDomainEnabled ? `Publishing ${appHostname.value}` : 'Publishing your workers.dev address' },
   ...(form.mailEnabled ? [{ step: 'mail' as const, label: `Setting up workspace email for ${mailDomain.value}` }] : []),
@@ -169,6 +192,7 @@ async function disconnect() {
   await $fetch('/api/cloudflare/logout', { method: 'POST' })
   result.value = null
   installation.value = null
+  form.instanceAdminToken = ''
   form.realtimekitApiToken = ''
   wizardStep.value = 0
   await refresh()
@@ -213,6 +237,7 @@ function handleDeployEvent(message: DeployProgressEvent) {
   }
   if (message.type === 'error') throw new Error(message.message)
   result.value = message.result
+  form.instanceAdminToken = ''
   form.realtimekitApiToken = ''
   wizardStep.value = 4
 }
@@ -337,7 +362,7 @@ useSeoMeta({
                     <UButton :to="oauthStartUrl" external label="Sign in with Cloudflare" trailing-icon="i-ph-arrow-right" size="xl" block />
                     <UButton v-if="!isUpgrade" :to="githubDeployUrl" target="_blank" label="Deploy with GitHub" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" size="xl" block />
                   </div>
-                  <p class="text-xs leading-5 text-muted">The token stays only in this one-hour installer session and is never added to your Discoflare Worker.</p>
+                  <p class="text-xs leading-5 text-muted">The OAuth grant lasts only for this installer session. Managed mode also asks you to create one account-owned token in Cloudflare and paste it once; Manual mode retains no deployment credential.</p>
                 </div>
               </template>
 
@@ -421,14 +446,41 @@ useSeoMeta({
                   <div class="flex justify-between gap-4"><span class="text-muted">Data</span><span class="text-default">Existing D1, R2, and KV</span></div>
                 </div>
 
+                <div class="mt-6 space-y-4 rounded-xl border border-default p-5">
+                  <UFormField label="Installation management" required>
+                    <URadioGroup
+                      v-model="form.managementMode"
+                      :items="[
+                        { label: 'Manual', value: 'manual', description: 'Authorize Cloudflare again on discoflare.com whenever you update or repair this installation.' },
+                        { label: 'Managed', value: 'managed', description: 'Store one account-owned token in this Worker for updates, Huddles, and Cloudflare email infrastructure.' },
+                      ]"
+                    />
+                  </UFormField>
+                  <UAlert
+                    v-if="form.managementMode === 'managed'"
+                    color="warning"
+                    variant="subtle"
+                    icon="i-ph-warning"
+                    title="Use a dedicated Cloudflare account for isolation"
+                    description="The token is available only to this Worker, but its Cloudflare permissions cover the selected account and its zones. A compromised installation could use every granted permission there."
+                  />
+                  <div v-if="form.managementMode === 'managed'" class="space-y-4 border-t border-muted pt-5">
+                    <p class="text-sm leading-6 text-muted">Cloudflare does not allow public OAuth apps to create account-owned tokens. Open the pre-filled form, create the token in Cloudflare, then paste the value shown once. It passes through this install request into the Worker secret; discoflare.com does not retain it.</p>
+                    <UButton :to="instanceAdminTokenUrl" target="_blank" external label="Create instance admin token" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" />
+                    <UFormField label="Instance admin token" required hint="Stored only as this installed Worker's encrypted secret.">
+                      <UInput v-model="form.instanceAdminToken" type="password" autocomplete="off" class="w-full" />
+                    </UFormField>
+                  </div>
+                  <p v-else class="text-xs leading-5 text-muted">Manual mode stores no instance admin token. Existing Cloudflare resources continue running between installer sessions.</p>
+                </div>
+
                 <div class="mt-6 space-y-5 rounded-xl border border-default p-5">
                   <USwitch
                     v-model="form.realtimekitEnabled"
                     label="RealtimeKit Huddles"
-                    :disabled="existingRealtimeKit"
-                    :description="existingRealtimeKit ? 'The existing Worker secret and RealtimeKit app stay connected.' : 'Add voice, video, and screen sharing with a Realtime-only Cloudflare API token.'"
+                    :description="form.managementMode === 'managed' ? 'Enabled by default and controlled with the same instance admin token.' : existingManualRealtimeKit ? 'The existing manual Realtime token stays connected.' : 'Add voice, video, and screen sharing with a Realtime-only Cloudflare API token.'"
                   />
-                  <div v-if="form.realtimekitEnabled && !existingRealtimeKit" class="space-y-4 border-t border-muted pt-5">
+                  <div v-if="needsManualRealtimeToken" class="space-y-4 border-t border-muted pt-5">
                     <p class="text-sm leading-6 text-muted">Cloudflare requires a persistent API token for the workspace backend. Create one with only <strong class="font-medium text-default">Account → Realtime → Admin</strong>, then paste the value shown once. The installer sends it directly to the Worker secret and does not retain it.</p>
                     <UButton :to="realtimeTokenUrl" target="_blank" external label="Create Realtime token" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" />
                     <UFormField label="Realtime API token" required hint="Stored only as the installed Worker's encrypted secret.">
