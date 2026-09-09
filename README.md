@@ -22,15 +22,14 @@ The marketing routes are prerendered. The temporary Cloudflare OAuth bootstrap u
 
 Cloudflare Workers Builds deploys the site automatically when a commit is pushed to `main`:
 
-```bash
-pnpm deploy
-```
+1. Build command: `pnpm run build`
+2. Deploy command: `pnpm run deploy`
 
-The Worker and `discoflare.com` custom domain are configured in [`wrangler.jsonc`](wrangler.jsonc).
+The deploy command rejects local execution and non-production branches. Do not deploy `discoflare-com` from a developer machine. The Worker and `discoflare.com` custom domain are configured in [`wrangler.jsonc`](wrangler.jsonc).
 
 Production requires the secrets from `.env.example`. Register the OAuth callback as `https://discoflare.com/api/cloudflare/oauth/callback` and allow the Worker and Access scopes fixed in `server/utils/cloudflare-oauth.ts`. The hosted bootstrap requests no persistent token, RealtimeKit permission, email permission, or workspace data. Owners connect the broader account-owned credential later on their own Discoflare Admin origin.
 
-The public infrastructure counters use the `discoflare-com-telemetry` D1 database. Create it once with `pnpm db:create`, put the returned database ID into `wrangler.jsonc` if Wrangler does not resolve the name automatically, apply `migrations/` with `pnpm db:migrate`, and configure `NUXT_TELEMETRY_HASH_SECRET` as a Worker secret. Only a keyed hash of the Cloudflare account and Worker identity is retained; raw account IDs, Worker names, domains, owner details, and workspace content are not stored.
+The public infrastructure counters use the `discoflare-com-telemetry` D1 database. Create it once with `pnpm db:create`, put the returned database ID into `wrangler.jsonc` if Wrangler does not resolve the name automatically, and configure `NUXT_TELEMETRY_HASH_SECRET` as a Worker secret. Production migrations run only inside the Workers Builds deploy command. Only a keyed hash of the Cloudflare account and Worker identity is retained; raw account IDs, Worker names, domains, owner details, and workspace content are not stored.
 
 ## Product demos
 
