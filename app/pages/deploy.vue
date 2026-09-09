@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onBeforeRouteLeave } from 'vue-router'
-import { instanceAdminTokenTemplateUrl } from '@discoflare/installer-core'
 import type {
   CloudflareInstallation,
   DeployProgressEvent,
@@ -78,34 +77,9 @@ watch(() => session.value.connected, (connected) => {
 const accountZones = computed(() => session.value.zones.filter(zone => zone.accountId === form.accountId && zone.status === 'active'))
 const appHostname = computed(() => form.customDomainEnabled && form.zoneName ? `${form.appSubdomain}.${form.zoneName}` : '')
 const mailDomain = computed(() => form.zoneName ? `${form.mailSubdomain}.${form.zoneName}` : '')
-const mailboxAddress = computed(() => mailDomain.value ? `${form.mailLocalPart}@${mailDomain.value}` : '')
-const existingRealtimeKit = computed(() => installation.value?.configuration.realtimekitEnabled === true)
-const existingManualRealtimeKit = computed(() => existingRealtimeKit.value && installation.value?.configuration.managementMode === 'manual')
-const needsManualRealtimeToken = computed(() => (
-  form.managementMode === 'manual'
-  && form.realtimekitEnabled
-  && !existingManualRealtimeKit.value
-))
-const needsInstanceAdminToken = computed(() => form.managementMode === 'managed')
-const instanceAdminTokenUrl = computed(() => instanceAdminTokenTemplateUrl(form.workerName))
-const realtimeTokenUrl = computed(() => {
-  const permissions = encodeURIComponent(JSON.stringify([{ key: 'realtime', type: 'admin' }]))
-  const name = encodeURIComponent(`Discoflare ${form.workerName} RealtimeKit`)
-  return `https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=${permissions}&name=${name}`
-})
 
 watch(() => form.appSubdomain, (subdomain, previous) => {
   if (!form.mailSubdomain || form.mailSubdomain === previous) form.mailSubdomain = subdomain
-})
-
-watch(() => form.managementMode, (mode, previous) => {
-  if (mode === 'managed') {
-    form.realtimekitEnabled = true
-    form.realtimekitApiToken = ''
-  }
-  else if (previous === 'managed' && !isUpgrade) {
-    form.realtimekitEnabled = false
-  }
 })
 
 watch([() => form.accountId, accountZones], ([, zones]) => {
@@ -127,9 +101,7 @@ const instanceReady = computed(() => {
 })
 
 const optionsReady = computed(() => Boolean(
-  (!needsInstanceAdminToken.value || form.instanceAdminToken?.trim())
-  && (!needsManualRealtimeToken.value || form.realtimekitApiToken.trim())
-  && ((!form.customDomainEnabled && !form.mailEnabled)
+  ((!form.customDomainEnabled && !form.mailEnabled)
     || (form.zoneId
       && (!form.customDomainEnabled || form.appSubdomain)
       && (!form.mailEnabled || (form.mailSubdomain && form.mailLocalPart)))),
@@ -138,7 +110,7 @@ const optionsReady = computed(() => Boolean(
 const pageTitle = computed(() => {
   if (wizardStep.value === 0) return isUpgrade ? 'Upgrade Discoflare' : 'Deploy Discoflare'
   if (wizardStep.value === 1) return isUpgrade ? 'Choose the installation' : 'Name your workspace'
-  if (wizardStep.value === 2) return isUpgrade ? 'Review your upgrade' : 'Optional features'
+  if (wizardStep.value === 2) return isUpgrade ? 'Review your upgrade' : 'Choose the workspace address'
   if (wizardStep.value === 3) return isUpgrade ? 'Upgrading Discoflare' : 'Deploying Discoflare'
   return result.value?.updated ? 'Discoflare is updated' : 'Your Discoflare is live'
 })
@@ -146,7 +118,7 @@ const pageTitle = computed(() => {
 const pageDescription = computed(() => {
   if (wizardStep.value === 0) return 'Your own team workspace, in your Cloudflare account'
   if (wizardStep.value === 1) return isUpgrade ? `Find the installation at ${upgradeOrigin}` : 'Choose its address and who signs in first'
-  if (wizardStep.value === 2) return isUpgrade ? 'Existing storage and configuration stay in place' : 'Choose a custom workspace address, workspace email, or both'
+  if (wizardStep.value === 2) return isUpgrade ? 'Existing storage and configuration stay in place' : 'Use workers.dev or an optional domain you already own'
   if (wizardStep.value === 3) return 'Setting everything up in your Cloudflare account'
   return 'Everything was deployed and verified in your account'
 })
@@ -159,8 +131,8 @@ const deploymentItems = computed<Array<{ step: DeployProgressStep, label: string
   { step: 'database', label: 'Applying database migrations' },
   { step: 'assets', label: 'Uploading the web application' },
   { step: 'access', label: form.authMode === 'access' ? 'Setting up Cloudflare Access' : 'Configuring Discoflare accounts' },
-  { step: 'management', label: form.managementMode === 'managed' ? 'Verifying the instance admin token' : 'Configuring manual management' },
-  ...(form.realtimekitEnabled ? [{ step: 'realtimekit' as const, label: form.managementMode === 'managed' ? 'Connecting Huddles to the instance admin token' : existingManualRealtimeKit.value ? 'Keeping the manual Realtime token' : 'Creating and verifying RealtimeKit Huddles' }] : []),
+  { step: 'management', label: form.managementMode === 'managed' ? 'Preserving in-workspace Cloudflare management' : 'Leaving no deployment credential' },
+  ...(form.realtimekitEnabled ? [{ step: 'realtimekit' as const, label: 'Preserving RealtimeKit Huddles' }] : []),
   { step: 'worker', label: 'Deploying the Discoflare Worker' },
   { step: 'domain', label: form.customDomainEnabled ? `Publishing ${appHostname.value}` : 'Publishing your workers.dev address' },
   ...(form.mailEnabled ? [{ step: 'mail' as const, label: `Setting up workspace email for ${mailDomain.value}` }] : []),
@@ -362,7 +334,7 @@ useSeoMeta({
                     <UButton :to="oauthStartUrl" external label="Sign in with Cloudflare" trailing-icon="i-ph-arrow-right" size="xl" block />
                     <UButton v-if="!isUpgrade" :to="githubDeployUrl" target="_blank" label="Deploy with GitHub" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" size="xl" block />
                   </div>
-                  <p class="text-xs leading-5 text-muted">The OAuth grant lasts only for this installer session. Managed mode also asks you to create one account-owned token in Cloudflare and paste it once; Manual mode retains no deployment credential.</p>
+                  <p class="text-xs leading-5 text-muted">The OAuth grant lasts only for this installer session. No permanent Cloudflare credential is requested or retained here.</p>
                 </div>
               </template>
 
@@ -427,7 +399,7 @@ useSeoMeta({
 
               <template v-else-if="wizardStep === 2">
                 <div class="flex items-center justify-between gap-4">
-                  <div><h2 class="text-lg font-semibold text-highlighted">{{ isUpgrade ? 'Ready to upgrade' : 'Choose optional features' }}</h2><p class="mt-1 text-sm text-muted">{{ isUpgrade ? 'The installer keeps the current hostname, storage, and sign-in mode.' : 'Choose only what this first installation needs.' }}</p></div>
+                  <div><h2 class="text-lg font-semibold text-highlighted">{{ isUpgrade ? 'Ready to upgrade' : 'Choose the workspace address' }}</h2><p class="mt-1 text-sm text-muted">{{ isUpgrade ? 'The installer keeps the current hostname, storage, and sign-in mode.' : 'Cloudflare management and integrations are connected later from your own workspace.' }}</p></div>
                   <UButton type="button" label="Sign out" color="neutral" variant="ghost" size="sm" @click="disconnect" />
                 </div>
 
@@ -446,69 +418,16 @@ useSeoMeta({
                   <div class="flex justify-between gap-4"><span class="text-muted">Data</span><span class="text-default">Existing D1, R2, and KV</span></div>
                 </div>
 
-                <div class="mt-6 space-y-4 rounded-xl border border-default p-5">
-                  <UFormField label="Installation management" required>
-                    <URadioGroup
-                      v-model="form.managementMode"
-                      :items="[
-                        { label: 'Manual', value: 'manual', description: 'Authorize Cloudflare again on discoflare.com whenever you update or repair this installation.' },
-                        { label: 'Managed', value: 'managed', description: 'Store one account-owned token in this Worker for updates, Huddles, and Cloudflare email infrastructure.' },
-                      ]"
-                    />
-                  </UFormField>
-                  <UAlert
-                    v-if="form.managementMode === 'managed'"
-                    color="warning"
-                    variant="subtle"
-                    icon="i-ph-warning"
-                    title="Use a dedicated Cloudflare account for isolation"
-                    description="The token is available only to this Worker, but its Cloudflare permissions cover the selected account and its zones. A compromised installation could use every granted permission there."
-                  />
-                  <div v-if="form.managementMode === 'managed'" class="space-y-4 border-t border-muted pt-5">
-                    <p class="text-sm leading-6 text-muted">Cloudflare does not allow public OAuth apps to create account-owned tokens. Open the pre-filled form, create the token in Cloudflare, then paste the value shown once. It passes through this install request into the Worker secret; discoflare.com does not retain it.</p>
-                    <UButton :to="instanceAdminTokenUrl" target="_blank" external label="Create instance admin token" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" />
-                    <UFormField label="Instance admin token" required hint="Stored only as this installed Worker's encrypted secret.">
-                      <UInput v-model="form.instanceAdminToken" type="password" autocomplete="off" class="w-full" />
-                    </UFormField>
-                  </div>
-                  <p v-else class="text-xs leading-5 text-muted">Manual mode stores no instance admin token. Existing Cloudflare resources continue running between installer sessions.</p>
-                </div>
-
-                <div class="mt-6 space-y-5 rounded-xl border border-default p-5">
-                  <USwitch
-                    v-model="form.realtimekitEnabled"
-                    label="RealtimeKit Huddles"
-                    :description="form.managementMode === 'managed' ? 'Enabled by default and controlled with the same instance admin token.' : existingManualRealtimeKit ? 'The existing manual Realtime token stays connected.' : 'Add voice, video, and screen sharing with a Realtime-only Cloudflare API token.'"
-                  />
-                  <div v-if="needsManualRealtimeToken" class="space-y-4 border-t border-muted pt-5">
-                    <p class="text-sm leading-6 text-muted">Cloudflare requires a persistent API token for the workspace backend. Create one with only <strong class="font-medium text-default">Account → Realtime → Admin</strong>, then paste the value shown once. The installer sends it directly to the Worker secret and does not retain it.</p>
-                    <UButton :to="realtimeTokenUrl" target="_blank" external label="Create Realtime token" trailing-icon="i-ph-arrow-up-right" color="neutral" variant="outline" />
-                    <UFormField label="Realtime API token" required hint="Stored only as the installed Worker's encrypted secret.">
-                      <UInput v-model="form.realtimekitApiToken" type="password" autocomplete="off" class="w-full" />
-                    </UFormField>
-                  </div>
-                </div>
-
                 <form v-if="!isUpgrade" class="mt-6 space-y-6" @submit.prevent="deploy">
-                  <div class="space-y-5">
-                    <USwitch v-model="form.customDomainEnabled" label="Custom domain" description="Otherwise the workspace uses your account’s workers.dev address." />
-                    <div class="border-t border-muted pt-5"><USwitch v-model="form.mailEnabled" label="Workspace email" description="Create a mailbox and route this domain’s catch-all email to Discoflare." /></div>
-                  </div>
+                  <USwitch v-model="form.customDomainEnabled" label="Custom domain" description="Otherwise the workspace uses your account’s workers.dev address." />
 
-                  <div v-if="form.customDomainEnabled || form.mailEnabled" class="space-y-5 rounded-xl border border-default bg-elevated p-5">
+                  <div v-if="form.customDomainEnabled" class="space-y-5 rounded-xl border border-default bg-elevated p-5">
                     <div>
                       <p class="text-sm font-medium text-highlighted">Domain settings</p>
-                      <p v-if="form.customDomainEnabled && form.mailEnabled" class="mt-1 text-sm text-muted">The same Cloudflare domain is used for the workspace address and workspace email.</p>
-                      <p v-else-if="form.customDomainEnabled" class="mt-1 text-sm text-muted">Email routing stays unchanged.</p>
-                      <p v-else class="mt-1 text-sm text-muted">This domain is used only for workspace email. The workspace keeps its workers.dev address.</p>
+                      <p class="mt-1 text-sm text-muted">Email routing stays unchanged until Cloudflare management is connected inside the workspace.</p>
                     </div>
                     <UFormField label="Cloudflare domain" required hint="Must be active in the selected account."><USelect v-model="form.zoneId" :items="accountZones.map(zone => ({ label: zone.name, value: zone.id }))" value-key="value" class="w-full" placeholder="Select a domain" /></UFormField>
-                    <UFormField v-if="form.customDomainEnabled" label="Discoflare subdomain" required><UInput v-model="form.appSubdomain" autocomplete="off" class="w-full"><template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template></UInput></UFormField>
-                    <div v-if="form.mailEnabled" class="grid gap-5 sm:grid-cols-2">
-                      <UFormField label="Email subdomain" required><UInput v-model="form.mailSubdomain" autocomplete="off" class="w-full"><template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template></UInput></UFormField>
-                      <UFormField label="First mailbox" required><UInput v-model="form.mailLocalPart" autocomplete="off" class="w-full"><template #trailing><span v-if="mailDomain" class="text-xs text-muted">@{{ mailDomain }}</span></template></UInput></UFormField>
-                    </div>
-                    <UAlert v-if="form.zoneName && form.mailEnabled" color="warning" variant="subtle" :title="`Email for ${mailDomain} will be handled by Discoflare`" :description="`The installer creates ${mailboxAddress}. Existing non-Cloudflare MX or catch-all routes stop installation instead of being replaced.`" />
+                    <UFormField label="Discoflare subdomain" required><UInput v-model="form.appSubdomain" autocomplete="off" class="w-full"><template #trailing><span v-if="form.zoneName" class="text-xs text-muted">.{{ form.zoneName }}</span></template></UInput></UFormField>
                   </div>
 
                   <UFormField v-if="form.authMode === 'builtin'" label="Registration" required>
