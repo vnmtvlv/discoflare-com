@@ -19,7 +19,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
-    "@discoflare/installer-core": "https://github.com/vnmtvlv/discoflare/releases/download/v0.4.2/discoflare-installer-core-0.4.2.tgz",
+    "@discoflare/installer-core": "https://github.com/vnmtvlv/discoflare/releases/download/v0.6.0/discoflare-installer-core-0.6.0.tgz",
     "@iconify-json/lucide": "^1.2.97",
     "@iconify-json/ph": "^1.2.2",
     "@nuxt/content": "^3.16.0",
