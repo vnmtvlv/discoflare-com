@@ -26,10 +26,6 @@ export const CLOUDFLARE_OAUTH_SCOPES = [
   'zone-settings.write',
   'dns.read',
   'dns.write',
-  'email-routing-rule.read',
-  'email-routing-rule.write',
-  'email-sending.read',
-  'email-sending.write',
 ].join(' ')
 
 export function installerOrigin(event: H3Event) {

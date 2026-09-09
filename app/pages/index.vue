@@ -218,8 +218,9 @@ const costRows = [
 
 const deploySteps = [
   { number: '01', title: 'Connect Cloudflare', description: 'Choose the Cloudflare account that will own the workspace.' },
-  { number: '02', title: 'Install or update', description: 'Discoflare provisions the Worker and its Cloudflare resources.' },
+  { number: '02', title: 'Install', description: 'Discoflare provisions the base Worker and its Cloudflare resources without a permanent token.' },
   { number: '03', title: 'Open your workspace', description: 'Create the first owner on the configured workspace hostname.' },
+  { number: '04', title: 'Connect everything', description: 'Optionally add the Instance Admin Token on your own workspace origin to enable Huddles, updates, and eligible email.' },
 ]
 
 const faqItems: AccordionItem[] = [

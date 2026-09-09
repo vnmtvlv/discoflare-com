@@ -26,11 +26,6 @@ const scopeGroups = [
     reason: 'Point the workspace hostname at the Worker on a domain in the same account.',
   },
   {
-    purpose: 'Optional workspace email',
-    scopes: ['email-routing-rule.read', 'email-routing-rule.write', 'email-sending.read', 'email-sending.write'],
-    reason: 'Route inbound mail into shared mailboxes and let the workspace send replies from your domain.',
-  },
-  {
     purpose: 'Optional Cloudflare Access sign-in',
     scopes: ['access.read', 'access.write', 'access-acct.read', 'access-acct.write'],
     reason: 'Create the Access application that sits in front of the workspace when you choose Access instead of built-in sign-in.',
@@ -115,7 +110,8 @@ useHead({
     <section>
       <h2>What the installer asks for</h2>
       <p>Connecting Cloudflare grants an OAuth token scoped to the permissions below. The token is kept in an encrypted, HTTP-only session cookie in your browser, is never written to a Discoflare database, and the session expires after one hour. Disconnecting revokes it immediately; you can also revoke it yourself from your Cloudflare account at any time.</p>
-      <p>The installer requests one fixed set of scopes when you connect, including the scopes for optional features. Declining workspace email or Cloudflare Access means those scopes go unused, not unrequested.</p>
+      <p>The installer requests one fixed set of scopes for the base deployment and optional Cloudflare Access. It does not request RealtimeKit, Email Routing, or Email Sending permission.</p>
+      <p>If you later connect Cloudflare management, the token template and input live on your installed workspace origin. That broader account-owned token goes directly to your Worker, never through discoflare.com, and enables RealtimeKit plus email when the installation has an eligible domain.</p>
       <div v-for="group in scopeGroups" :key="group.purpose" class="scope-group">
         <h3>{{ group.purpose }}</h3>
         <p>{{ group.reason }}</p>
